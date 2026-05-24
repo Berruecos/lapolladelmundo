@@ -9,51 +9,47 @@ export default function Reglamento() {
   ]
 
   const reglas = [
-    { icon: '💰', titulo: 'Inscripción', texto: '$100.000 COP. Sin pago antes del partido inaugural = puntaje 0.' },
-    { icon: '🏆', titulo: 'Premios', texto: '1° puesto: 60% del total · 2° puesto: 20% · Cerveza del organizador: 20%.' },
-    { icon: '⏰', titulo: 'Deadline', texto: 'Pronósticos antes de las 23:59 del día anterior a cada fecha. Si no, resultado 0–0 autogol.' },
-    { icon: '✏️', titulo: 'Mensajes editados', texto: 'No se consideran. Resultado automático: 0–0, autogol.' },
-    { icon: '🔁', titulo: 'Doble pronóstico', texto: 'Si mandas dos, solo cuenta el primero.' },
-    { icon: '🧮', titulo: 'Marcador exacto', texto: 'No acumula con acertar resultado. Solo se toma el mayor.' },
+    { icon: '⏰', titulo: 'Deadline', texto: 'Pronósticos antes de las 23:59 del día anterior a cada fecha. Si no enviaste, recibes 0–0 autogol automático.' },
+    { icon: '🔒', titulo: 'No editable', texto: 'Una vez enviado tu pronóstico, queda bloqueado. No se puede modificar.' },
+    { icon: '1️⃣', titulo: 'Solo una vez', texto: 'El pronóstico se envía una sola vez por partido.' },
+    { icon: '🧮', titulo: 'Marcador exacto', texto: 'No acumula con acertar resultado. Solo se toma el mayor puntaje.' },
     { icon: '⏱️', titulo: 'Tiempo reglamentario', texto: 'Marcadores válidos solo a los 90 minutos.' },
     { icon: '🥅', titulo: '0-0 en tiempo extra', texto: 'El primer anotador es el que anote en prórroga o el primer penalti.' },
+    { icon: '🙃', titulo: 'Autogol', texto: 'Si el primer gol es autogol, nadie gana puntos por anotador.' },
     { icon: '🚫', titulo: '3° y 4° puesto', texto: 'No suma puntos.' },
   ]
 
   return (
-    <div style={styles.page}>
-      <h2 style={styles.sectionTitle}>Tabla de puntos</h2>
-      <div style={styles.tableWrap}>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Ronda</th>
-              <th style={styles.th}>Marcador</th>
-              <th style={styles.th}>Anotador</th>
-              <th style={styles.th}>Resultado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {puntos.map(p => (
-              <tr key={p.ronda}>
-                <td style={styles.td}><strong style={{fontWeight:600}}>{p.fase}</strong></td>
-                <td style={{...styles.td, ...styles.pts}}>{p.marcador} pts</td>
-                <td style={{...styles.td, ...styles.pts}}>{p.anotador} pts</td>
-                <td style={{...styles.td, ...styles.pts}}>{p.resultado} pt{p.resultado>1?'s':''}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div style={s.page}>
+      <div style={s.titleArea}>
+        <div style={s.sectionTitle}>TABLA DE PUNTOS</div>
       </div>
 
-      <h2 style={{...styles.sectionTitle, marginTop: '1.5rem'}}>Reglas</h2>
-      <div style={styles.reglasList}>
+      <div style={s.tableWrap}>
+        <div style={s.tableHeader}>
+          <span style={s.th}>FASE</span>
+          <span style={{...s.th, textAlign:'center'}}>MARCADOR</span>
+          <span style={{...s.th, textAlign:'center'}}>ANOTADOR</span>
+          <span style={{...s.th, textAlign:'center'}}>RESULTADO</span>
+        </div>
+        {puntos.map((p, i) => (
+          <div key={p.ronda} style={{...s.tableRow, background: i % 2 === 0 ? '#111' : '#0f0f0f'}}>
+            <span style={s.tdFase}>{p.fase}</span>
+            <span style={{...s.tdPts, color: '#C9A84C'}}>{p.marcador}</span>
+            <span style={{...s.tdPts, color: '#1E6FFF'}}>{p.anotador}</span>
+            <span style={{...s.tdPts, color: '#00C97A'}}>{p.resultado}</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{...s.sectionTitle, marginTop: '1.5rem'}}>REGLAS</div>
+      <div style={s.reglasList}>
         {reglas.map((r, i) => (
-          <div key={i} style={styles.regla}>
-            <span style={styles.reglaIcon}>{r.icon}</span>
+          <div key={i} style={s.regla}>
+            <span style={s.reglaIcon}>{r.icon}</span>
             <div>
-              <div style={styles.reglaTitulo}>{r.titulo}</div>
-              <div style={styles.reglaTexto}>{r.texto}</div>
+              <div style={s.reglaTitulo}>{r.titulo}</div>
+              <div style={s.reglaTexto}>{r.texto}</div>
             </div>
           </div>
         ))}
@@ -62,17 +58,19 @@ export default function Reglamento() {
   )
 }
 
-const styles = {
+const s = {
   page: { padding: '1rem 0' },
-  sectionTitle: { fontSize: 16, fontWeight: 700, color: '#1a1a1a', marginBottom: '0.75rem' },
-  tableWrap: { overflowX: 'auto', background: 'white', borderRadius: 12, border: '1px solid #f0f0f0' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  th: { padding: '10px 12px', textAlign: 'left', color: '#888', fontWeight: 600, borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' },
-  td: { padding: '10px 12px', borderBottom: '1px solid #f5f5f5', color: '#1a1a1a' },
-  pts: { fontWeight: 700, color: '#059669' },
-  reglasList: { display: 'flex', flexDirection: 'column', gap: 10 },
-  regla: { display: 'flex', gap: 12, background: 'white', border: '1px solid #f0f0f0', borderRadius: 10, padding: '12px 14px' },
+  titleArea: { marginBottom: '0.75rem' },
+  sectionTitle: { fontSize: 11, letterSpacing: 3, fontWeight: 700, color: '#C9A84C', marginBottom: '0.75rem' },
+  tableWrap: { borderRadius: 12, overflow: 'hidden', border: '1px solid #1e1e1e', marginBottom: '0.5rem' },
+  tableHeader: { display: 'flex', background: '#161616', padding: '8px 14px', gap: 8 },
+  th: { flex: 1, fontSize: 9, fontWeight: 700, letterSpacing: 2, color: '#444440' },
+  tableRow: { display: 'flex', padding: '10px 14px', gap: 8, alignItems: 'center' },
+  tdFase: { flex: 1, fontSize: 13, fontWeight: 600, color: '#F5F0E8' },
+  tdPts: { flex: 1, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900, textAlign: 'center' },
+  reglasList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  regla: { display: 'flex', gap: 12, background: '#111', border: '1px solid #1e1e1e', borderRadius: 10, padding: '12px 14px' },
   reglaIcon: { fontSize: 20, flexShrink: 0 },
-  reglaTitulo: { fontSize: 13, fontWeight: 700, color: '#1a1a1a', marginBottom: 2 },
-  reglaTexto: { fontSize: 13, color: '#666', lineHeight: 1.5 },
+  reglaTitulo: { fontSize: 13, fontWeight: 700, color: '#F5F0E8', marginBottom: 2 },
+  reglaTexto: { fontSize: 12, color: '#888880', lineHeight: 1.5 },
 }

@@ -3,14 +3,16 @@ import { useAuth } from './lib/AuthContext'
 import Login from './pages/Login'
 import Ranking from './pages/Ranking'
 import Pronosticos from './pages/Pronosticos'
-import Admin from './pages/Admin'
+import Rivales from './pages/Rivales'
 import Reglamento from './pages/Reglamento'
+import Admin from './pages/Admin'
 
 const TABS = [
-  { id: 'ranking', label: 'Tabla', icon: '🏆' },
-  { id: 'pronosticos', label: 'Mis picks', icon: '⚽' },
-  { id: 'reglamento', label: 'Reglas', icon: '📋' },
-  { id: 'admin', label: 'Admin', icon: '⚙️' },
+  { id: 'ranking', label: 'TABLA', icon: '🏆' },
+  { id: 'pronosticos', label: 'PICKS', icon: '⚽' },
+  { id: 'rivales', label: 'RIVALES', icon: '👀' },
+  { id: 'reglamento', label: 'REGLAS', icon: '📋' },
+  { id: 'admin', label: 'ADMIN', icon: '⚙️', adminOnly: true },
 ]
 
 export default function App() {
@@ -18,51 +20,49 @@ export default function App() {
   const [tab, setTab] = useState('ranking')
 
   if (loading) return (
-    <div style={styles.loading}>
-      <span style={styles.loadingBall}>⚽</span>
-      <p style={styles.loadingText}>Cargando...</p>
+    <div style={s.loading}>
+      <div style={s.loadingBall}>🏆</div>
+      <div style={s.loadingText}>LA POLLA DEL MUNDO</div>
+      <div style={s.loadingSub}>2026</div>
     </div>
   )
 
   if (!user || !participante) return <Login />
 
+  const visibleTabs = TABS.filter(t => !t.adminOnly || participante.es_admin)
+
   const renderTab = () => {
     switch(tab) {
       case 'ranking': return <Ranking participante={participante} />
       case 'pronosticos': return <Pronosticos participante={participante} />
+      case 'rivales': return <Rivales />
       case 'reglamento': return <Reglamento />
       case 'admin': return <Admin participante={participante} />
       default: return null
     }
   }
 
-  const visibleTabs = participante.es_admin ? TABS : TABS.filter(t => t.id !== 'admin')
-
   return (
-    <div style={styles.app}>
-      <div style={styles.header}>
+    <div style={s.app}>
+      <div style={s.header}>
         <div>
-          <div style={styles.headerTitle}>⚽ Polla Transcontinental</div>
-          <div style={styles.headerSub}>Mundial 2026 · Hola, {participante.nombre}</div>
+          <div style={s.headerTitle}>LA POLLA DEL MUNDO</div>
+          <div style={s.headerSub}>2026 · {participante.nombre}</div>
         </div>
-        <button style={styles.signOut} onClick={signOut}>Salir</button>
+        <button style={s.signOut} onClick={signOut}>SALIR</button>
       </div>
 
-      {!participante.pago && (
-        <div style={styles.noPagoBanner}>
-          ⚠️ Aún no has pagado la inscripción ($100.000). Tus puntos no contarán hasta que el organizador confirme tu pago.
-        </div>
-      )}
-
-      <div style={styles.content}>
+      <div style={s.content}>
         {renderTab()}
       </div>
 
-      <div style={styles.nav}>
+      <div style={s.nav}>
         {visibleTabs.map(t => (
-          <button key={t.id} style={{...styles.navBtn, ...(tab===t.id ? styles.navBtnActive : {})}} onClick={() => setTab(t.id)}>
-            <span style={styles.navIcon}>{t.icon}</span>
-            <span style={styles.navLabel}>{t.label}</span>
+          <button key={t.id}
+            style={{...s.navBtn, ...(tab===t.id ? s.navBtnActive : {})}}
+            onClick={() => setTab(t.id)}>
+            <span style={s.navIcon}>{t.icon}</span>
+            <span style={{...s.navLabel, ...(tab===t.id ? s.navLabelActive : {})}}>{t.label}</span>
           </button>
         ))}
       </div>
@@ -70,20 +70,21 @@ export default function App() {
   )
 }
 
-const styles = {
-  app: { minHeight: '100vh', background: '#f5f5f4', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto', position: 'relative' },
-  loading: { minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#f5f5f4' },
-  loadingBall: { fontSize: 48 },
-  loadingText: { fontSize: 16, color: '#888' },
-  header: { background: 'white', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', position: 'sticky', top: 0, zIndex: 10 },
-  headerTitle: { fontSize: 15, fontWeight: 700, color: '#1a1a1a' },
-  headerSub: { fontSize: 12, color: '#888', marginTop: 2 },
-  signOut: { background: 'none', border: '1px solid #e0e0e0', borderRadius: 6, padding: '5px 10px', fontSize: 12, cursor: 'pointer', color: '#888' },
-  noPagoBanner: { background: '#fffbeb', borderBottom: '1px solid #fde68a', padding: '10px 16px', fontSize: 12, color: '#92400e', lineHeight: 1.4 },
-  content: { flex: 1, padding: '0 16px', paddingBottom: 80, overflowY: 'auto' },
-  nav: { position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, background: 'white', borderTop: '1px solid #eee', display: 'flex', zIndex: 10 },
-  navBtn: { flex: 1, background: 'none', border: 'none', padding: '10px 4px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 },
-  navBtnActive: { background: '#fafafa' },
-  navIcon: { fontSize: 20 },
-  navLabel: { fontSize: 10, color: '#888', fontWeight: 500 },
+const s = {
+  app: { minHeight: '100vh', background: '#0a0a0a', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' },
+  loading: { minHeight: '100vh', background: '#0a0a0a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  loadingBall: { fontSize: 52, marginBottom: 8 },
+  loadingText: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 900, letterSpacing: 4, color: '#F5F0E8' },
+  loadingSub: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 32, fontWeight: 900, letterSpacing: 4, color: '#C9A84C' },
+  header: { background: '#0d0d0d', borderBottom: '1px solid #1e1e1e', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 },
+  headerTitle: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 900, letterSpacing: 3, color: '#F5F0E8' },
+  headerSub: { fontSize: 11, color: '#888880', letterSpacing: 1, marginTop: 1 },
+  signOut: { background: 'none', border: '1px solid #222', borderRadius: 6, padding: '5px 12px', fontSize: 10, cursor: 'pointer', color: '#888880', fontWeight: 700, letterSpacing: 1, fontFamily: "'Barlow Condensed', sans-serif" },
+  content: { flex: 1, padding: '0 16px', paddingBottom: 72, overflowY: 'auto' },
+  nav: { position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, background: '#0d0d0d', borderTop: '1px solid #1e1e1e', display: 'flex', zIndex: 10 },
+  navBtn: { flex: 1, background: 'none', border: 'none', padding: '8px 4px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 },
+  navBtnActive: { background: '#111' },
+  navIcon: { fontSize: 18 },
+  navLabel: { fontSize: 9, color: '#444440', fontWeight: 700, letterSpacing: 1, fontFamily: "'Barlow Condensed', sans-serif" },
+  navLabelActive: { color: '#C9A84C' },
 }
