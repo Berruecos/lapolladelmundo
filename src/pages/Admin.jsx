@@ -11,7 +11,12 @@ export default function Admin({ participante }) {
   const [ronda, setRonda] = useState('R1')
   const [form, setForm] = useState({ local: '', visita: '', fecha_hora: '', ronda: 'R1' })
   const [msg, setMsg] = useState('')
-  const [apiKey, setApiKey] = useState('')
+  const [apiKey, setApiKey] = useState(localStorage.getItem('api_football_key') || '')
+
+  function saveApiKey(key) {
+    setApiKey(key)
+    localStorage.setItem('api_football_key', key)
+  }
   const [syncing, setSyncing] = useState(false)
 
   useEffect(() => { fetchPartidos(); fetchParticipantes() }, [ronda])
@@ -161,7 +166,7 @@ export default function Admin({ participante }) {
         <div style={s.card}>
           <div style={s.cardTitle}>API-FOOTBALL</div>
           <p style={s.hint}>Regístrate gratis en <strong style={{color:'#C9A84C'}}>dashboard.api-football.com</strong>, copia tu API key y pégala aquí.</p>
-          <input style={s.input} type="text" placeholder="Tu API key" value={apiKey} onChange={e => setApiKey(e.target.value)} />
+          <input style={s.input} type="text" placeholder="Tu API key" value={apiKey} onChange={e => saveApiKey(e.target.value)} />
           <p style={{...s.hint, marginTop: 12}}>Para sincronizar, cada partido debe tener su <code style={s.code}>api_fixture_id</code>. Consúltalo así:<br/><code style={s.code}>GET /fixtures?league=1&season=2026</code></p>
         </div>
       )}

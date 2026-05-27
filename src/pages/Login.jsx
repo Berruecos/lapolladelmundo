@@ -35,7 +35,16 @@ export default function Login() {
       <div style={s.bg} />
       <div style={s.card}>
         <div style={s.logoArea}>
-          <div style={s.trophy}>🏆</div>
+          <div style={s.trophyWrap}>
+            <div style={s.trophyGlow} />
+            <img
+              src="/—Pngtree—fifa world cup trophy_8873382.png"
+              alt="Trofeo FIFA World Cup"
+              style={s.trophyImg}
+              onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='block' }}
+            />
+            <span style={{display:'none', fontSize:52}}>🏆</span>
+          </div>
           <div style={s.title}>LA POLLA DEL</div>
           <div style={s.titleGold}>MUNDO 2026</div>
           <div style={s.subtitle}>USA · CANADA · MÉXICO</div>
@@ -86,7 +95,9 @@ const s = {
   bg: { position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 0%, #1a1200 0%, #0a0a0a 60%)', pointerEvents: 'none' },
   card: { width: '100%', maxWidth: 400, position: 'relative', zIndex: 1 },
   logoArea: { textAlign: 'center', marginBottom: '2rem' },
-  trophy: { fontSize: 52, marginBottom: 12, display: 'block' },
+  trophyWrap: { position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  trophyGlow: { position: 'absolute', width: 120, height: 120, borderRadius: '50%', background: 'radial-gradient(circle, #C9A84C33 0%, transparent 70%)', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
+  trophyImg: { width: 110, height: 'auto', position: 'relative', zIndex: 1, filter: 'drop-shadow(0 4px 20px #C9A84C66)' },
   title: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 32, fontWeight: 900, letterSpacing: 4, color: '#F5F0E8', lineHeight: 1 },
   titleGold: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 36, fontWeight: 900, letterSpacing: 4, color: '#C9A84C', lineHeight: 1, marginBottom: 8 },
   subtitle: { fontSize: 11, letterSpacing: 3, color: '#888880', fontWeight: 500 },
