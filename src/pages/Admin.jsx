@@ -47,10 +47,14 @@ export default function Admin({ participante }) {
     const visita = parseInt(prompt(`Goles de ${partido.equipo_visita}:`))
     const scorer = prompt('Primer anotador (nombre exacto o "autogol"):')
     if (isNaN(local) || isNaN(visita)) return
-    await supabase.from('partidos').update({ goles_local: local, goles_visita: visita, primer_anotador: scorer || null, estado: 'finalizado' }).eq('id', partido.id)
-    await supabase.rpc('calcular_puntos', { p_partido_id: partido.id })
-    showMsg('Resultado guardado y puntos calculados ✓')
-    fetchPartidos()
+    const { error } = await supabase.rpc('registrar_resultado', {
+      p_partido_id: partido.id,
+      p_goles_local: local,
+      p_goles_visita: visita,
+      p_primer_anotador: scorer || null,
+    })
+    if (error) showMsg('Error: ' + error.message)
+    else { showMsg('Resultado guardado y puntos calculados ✓'); fetchPartidos() }
   }
 
   async function syncDesdeAPI(partido) {
