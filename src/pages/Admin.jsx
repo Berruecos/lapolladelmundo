@@ -12,12 +12,12 @@ export default function Admin({ participante }) {
   const [form, setForm] = useState({ local: '', visita: '', fecha_hora: '', ronda: 'R1' })
   const [msg, setMsg] = useState('')
   const [apiKey, setApiKey] = useState(localStorage.getItem('api_football_key') || '')
+  const [syncing, setSyncing] = useState(false)
 
   function saveApiKey(key) {
     setApiKey(key)
     localStorage.setItem('api_football_key', key)
   }
-  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => { fetchPartidos(); fetchParticipantes() }, [ronda])
 
@@ -39,12 +39,12 @@ export default function Admin({ participante }) {
       fecha_hora: form.fecha_hora, estado: 'pendiente',
     })
     if (error) showMsg('Error: ' + error.message)
-    else { showMsg('Partido agregado ✓'); setForm({ ...form, local: '', visita: '', fecha_hora: '' }); fetchPartidos() }
+    else { showMsg('Partido agregado'); setForm({ ...form, local: '', visita: '', fecha_hora: '' }); fetchPartidos() }
   }
 
   async function registrarResultado(partido) {
-    const local = parseInt(prompt(`Goles de ${partido.equipo_local}:`))
-    const visita = parseInt(prompt(`Goles de ${partido.equipo_visita}:`))
+    const local = parseInt(prompt('Goles de ' + partido.equipo_local + ':'))
+    const visita = parseInt(prompt('Goles de ' + partido.equipo_visita + ':'))
     if (isNaN(local) || isNaN(visita)) return
 
     const { data: jugs } = await supabase
@@ -52,23 +52,16 @@ export default function Admin({ participante }) {
       .in('equipo', [partido.equipo_local, partido.equipo_visita])
       .order('numero')
 
- const opciones = ['autogol', ...(jugs || []).map(j => j.numero ? j.numero + ' · ' + j.nombre : j.nombre)]
-    const lista = opciones.map((o,i) => i + ': ' + o).join('\n')
-    const seleccion = prompt('Primer anotador:\n' + lista + '\n\nEscribe el número:')
+    const jugList = (jugs || []).map(j => j.numero ? j.numero + ' - ' + j.nombre : j.nombre)
+    const opciones = ['0: autogol', ...jugList.map((n, i) => (i + 1) + ': ' + n)]
+    const seleccion = prompt('Primer anotador - escribe el numero:\n' + opciones.join('\n'))
     if (seleccion === null) return
     const idx = parseInt(seleccion)
-    const scorer = !isNaN(idx) && opciones[idx]
-      ? (idx === 0 ? 'autogol' : (jugs || [])[idx - 1]?.nombre || opciones[idx])
-      : seleccion
-${opciones.map((o,i) => `${i}: ${o}`).join('
-')}
-
-Escribe el número:`)
-    if (seleccion === null) return
-    const idx = parseInt(seleccion)
-    const scorer = !isNaN(idx) && opciones[idx]
-      ? (idx === 0 ? 'autogol' : (jugs || [])[idx - 1]?.nombre || opciones[idx])
-      : seleccion
+    let scorer = seleccion
+    if (!isNaN(idx)) {
+      if (idx === 0) scorer = 'autogol'
+      else scorer = (jugs || [])[idx - 1]?.nombre || seleccion
+    }
 
     const { error } = await supabase.rpc('registrar_resultado', {
       p_partido_id: partido.id,
@@ -77,19 +70,20 @@ Escribe el número:`)
       p_primer_anotador: scorer || null,
     })
     if (error) showMsg('Error: ' + error.message)
-    else { showMsg('Resultado guardado y puntos calculados ✓'); fetchPartidos() }
+    else { showMsg('Resultado guardado y puntos calculados'); fetchPartidos() }
   }
 
   async function eliminarPartido(partido) {
-    if (!confirm(`¿Eliminar ${partido.equipo_local} vs ${partido.equipo_visita}?`)) return
+    if (!confirm('Eliminar ' + partido.equipo_local + ' vs ' + partido.equipo_visita + '?')) return
     await supabase.from('partidos').delete().eq('id', partido.id)
-    showMsg('Partido eliminado ✓')
+    showMsg('Partido eliminado')
     fetchPartidos()
   }
 
   async function ocultarPartido(partido) {
-    await supabase.from('partidos').update({ estado: partido.estado === 'oculto' ? 'pendiente' : 'oculto' }).eq('id', partido.id)
-    showMsg(partido.estado === 'oculto' ? 'Partido visible ✓' : 'Partido oculto ✓')
+    const nuevoEstado = partido.estado === 'oculto' ? 'pendiente' : 'oculto'
+    await supabase.from('partidos').update({ estado: nuevoEstado }).eq('id', partido.id)
+    showMsg(partido.estado === 'oculto' ? 'Partido visible' : 'Partido oculto')
     fetchPartidos()
   }
 
@@ -97,22 +91,28 @@ Escribe el número:`)
     if (!apiKey) { showMsg('Primero agrega tu API key'); return }
     setSyncing(true)
     try {
-      const res = await fetch(`https://v3.football.api-sports.io/fixtures?id=${partido.api_fixture_id}`, {
+      const res = await fetch('https://v3.football.api-sports.io/fixtures?id=' + partido.api_fixture_id, {
         headers: { 'x-apisports-key': apiKey }
       })
       const data = await res.json()
-      const fix = data.response?.[0]
+      const fix = data.response && data.response[0]
       if (!fix) { showMsg('Partido no encontrado en la API'); setSyncing(false); return }
-      if (!['FT','AET','PEN'].includes(fix.fixture.status.short)) { showMsg('El partido aún no ha terminado'); setSyncing(false); return }
-      const local = fix.goals.home
-      const visita = fix.goals.away
+      const status = fix.fixture.status.short
+      if (status !== 'FT' && status !== 'AET' && status !== 'PEN') {
+        showMsg('El partido aun no ha terminado'); setSyncing(false); return
+      }
+      const golesLocal = fix.goals.home
+      const golesVisita = fix.goals.away
       const events = fix.events || []
-      const firstGoal = events.find(e => e.type === 'Goal')
-      const isOwnGoal = firstGoal?.detail === 'Own Goal'
-      const scorer = isOwnGoal ? 'autogol' : firstGoal?.player?.name || null
-      await supabase.from('partidos').update({ goles_local: local, goles_visita: visita, primer_anotador: scorer, estado: 'finalizado' }).eq('id', partido.id)
+      const firstGoal = events.find(function(e) { return e.type === 'Goal' })
+      const isOwnGoal = firstGoal && firstGoal.detail === 'Own Goal'
+      const scorer = isOwnGoal ? 'autogol' : (firstGoal && firstGoal.player && firstGoal.player.name) || null
+      await supabase.from('partidos').update({
+        goles_local: golesLocal, goles_visita: golesVisita,
+        primer_anotador: scorer, estado: 'finalizado'
+      }).eq('id', partido.id)
       await supabase.rpc('calcular_puntos', { p_partido_id: partido.id })
-      showMsg(`Sincronizado: ${local}–${visita} · ${scorer || 'sin anotador'}`)
+      showMsg('Sincronizado: ' + golesLocal + '-' + golesVisita + ' · ' + (scorer || 'sin anotador'))
       fetchPartidos()
     } catch (err) {
       showMsg('Error: ' + err.message)
@@ -120,98 +120,108 @@ Escribe el número:`)
     setSyncing(false)
   }
 
-  function showMsg(m) { setMsg(m); setTimeout(() => setMsg(''), 4000) }
+  function showMsg(m) { setMsg(m); setTimeout(function() { setMsg('') }, 4000) }
 
-  const fmtFecha = f => new Date(f).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  const fmtFecha = function(f) {
+    return new Date(f).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  }
 
-  if (!participante?.es_admin) return (
-    <div style={s.noAdmin}>🔒 Solo para el organizador.</div>
+  if (!participante || !participante.es_admin) return (
+    <div style={s.noAdmin}>Solo para el organizador.</div>
   )
 
   return (
     <div style={s.page}>
       <div style={s.tabs}>
-        {['partidos','participantes','api'].map(t => (
-          <button key={t} style={{...s.tab, ...(tab===t ? s.tabActive : {})}} onClick={() => setTab(t)}>
-            {t.toUpperCase()}
-          </button>
-        ))}
+        {['partidos','participantes','api'].map(function(t) {
+          return (
+            <button key={t} style={tab===t ? {...s.tab, ...s.tabActive} : s.tab} onClick={function() { setTab(t) }}>
+              {t.toUpperCase()}
+            </button>
+          )
+        })}
       </div>
 
-      {msg && <div style={s.msgBox}>{msg}</div>}
+      {msg ? <div style={s.msgBox}>{msg}</div> : null}
 
       {tab === 'partidos' && (
-        <>
+        <div>
           <div style={s.card}>
             <div style={s.cardTitle}>AGREGAR PARTIDO</div>
             <form onSubmit={addPartido} style={s.form}>
-              <select style={s.input} value={form.ronda} onChange={e => setForm({...form, ronda: e.target.value})}>
-                {RONDAS.map(r => <option key={r} value={r}>{r} — {FASES[r]}</option>)}
+              <select style={s.input} value={form.ronda} onChange={function(e) { setForm({...form, ronda: e.target.value}) }}>
+                {RONDAS.map(function(r) { return <option key={r} value={r}>{r} - {FASES[r]}</option> })}
               </select>
               <div style={s.row2}>
-                <input style={s.input} placeholder="Equipo local" value={form.local} onChange={e => setForm({...form, local: e.target.value})} required />
-                <input style={s.input} placeholder="Equipo visitante" value={form.visita} onChange={e => setForm({...form, visita: e.target.value})} required />
+                <input style={s.input} placeholder="Equipo local" value={form.local} onChange={function(e) { setForm({...form, local: e.target.value}) }} required />
+                <input style={s.input} placeholder="Equipo visitante" value={form.visita} onChange={function(e) { setForm({...form, visita: e.target.value}) }} required />
               </div>
-              <input style={s.input} type="datetime-local" value={form.fecha_hora} onChange={e => setForm({...form, fecha_hora: e.target.value})} required />
+              <input style={s.input} type="datetime-local" value={form.fecha_hora} onChange={function(e) { setForm({...form, fecha_hora: e.target.value}) }} required />
               <button style={s.btn} type="submit">+ AGREGAR</button>
             </form>
           </div>
 
           <div style={s.rondas}>
-            {RONDAS.map(r => (
-              <button key={r} style={{...s.rondaBtn, ...(ronda===r ? s.rondaActive : {})}} onClick={() => setRonda(r)}>
-                {FASES[r]}
-              </button>
-            ))}
+            {RONDAS.map(function(r) {
+              return (
+                <button key={r} style={ronda===r ? {...s.rondaBtn, ...s.rondaActive} : s.rondaBtn} onClick={function() { setRonda(r) }}>
+                  {FASES[r]}
+                </button>
+              )
+            })}
           </div>
 
-          {partidos.map(p => (
-            <div key={p.id} style={s.partidoCard}>
-              <div style={s.partidoInfo}>
-                <div style={s.partidoNombre}>{p.equipo_local} vs {p.equipo_visita}</div>
-                <div style={s.partidoFecha}>{fmtFecha(p.fecha_hora)}</div>
-                {p.goles_local !== null && (
-                  <div style={s.resultadoBadge}>✓ {p.goles_local}–{p.goles_visita} · {p.primer_anotador || 'sin anotador'}</div>
-                )}
-              </div>
-              <div style={s.partidoActions}>
-                <button style={s.btnSm} onClick={() => registrarResultado(p)}>Manual</button>
-                {p.api_fixture_id && (
-                  <button style={{...s.btnSm, ...s.btnGold}} onClick={() => syncDesdeAPI(p)} disabled={syncing}>
-                    {syncing ? '...' : 'Sync API'}
+          {partidos.map(function(p) {
+            return (
+              <div key={p.id} style={s.partidoCard}>
+                <div style={s.partidoInfo}>
+                  <div style={s.partidoNombre}>{p.equipo_local} vs {p.equipo_visita}</div>
+                  <div style={s.partidoFecha}>{fmtFecha(p.fecha_hora)}</div>
+                  {p.goles_local !== null && (
+                    <div style={s.resultadoBadge}>Resultado: {p.goles_local}-{p.goles_visita} · {p.primer_anotador || 'sin anotador'}</div>
+                  )}
+                </div>
+                <div style={s.partidoActions}>
+                  <button style={s.btnSm} onClick={function() { registrarResultado(p) }}>Manual</button>
+                  {p.api_fixture_id && (
+                    <button style={{...s.btnSm, ...s.btnGold}} onClick={function() { syncDesdeAPI(p) }} disabled={syncing}>
+                      {syncing ? '...' : 'Sync API'}
+                    </button>
+                  )}
+                  <button style={{...s.btnSm, ...s.btnWarning}} onClick={function() { ocultarPartido(p) }}>
+                    {p.estado === 'oculto' ? 'Mostrar' : 'Ocultar'}
                   </button>
-                )}
-                <button style={{...s.btnSm, ...s.btnWarning}} onClick={() => ocultarPartido(p)}>
-                  {p.estado === 'oculto' ? '👁 Mostrar' : '🙈 Ocultar'}
-                </button>
-                <button style={{...s.btnSm, ...s.btnDanger}} onClick={() => eliminarPartido(p)}>🗑</button>
+                  <button style={{...s.btnSm, ...s.btnDanger}} onClick={function() { eliminarPartido(p) }}>Borrar</button>
+                </div>
               </div>
-            </div>
-          ))}
-        </>
+            )
+          })}
+        </div>
       )}
 
       {tab === 'participantes' && (
         <div>
-          {participantes.map(p => (
-            <div key={p.id} style={s.partRow}>
-              <div style={s.partInfo}>
-                <div style={s.partNombre}>
-                  {p.nombre}
-                  {p.es_admin && <span style={s.adminBadge}>ADMIN</span>}
+          {participantes.map(function(p) {
+            return (
+              <div key={p.id} style={s.partRow}>
+                <div style={s.partInfo}>
+                  <div style={s.partNombre}>
+                    {p.nombre}
+                    {p.es_admin && <span style={s.adminBadge}>ADMIN</span>}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
       {tab === 'api' && (
         <div style={s.card}>
           <div style={s.cardTitle}>API-FOOTBALL</div>
-          <p style={s.hint}>Regístrate gratis en <strong style={{color:'#C9A84C'}}>dashboard.api-football.com</strong>, copia tu API key y pégala aquí.</p>
-          <input style={s.input} type="text" placeholder="Tu API key" value={apiKey} onChange={e => saveApiKey(e.target.value)} />
-          <p style={{...s.hint, marginTop: 12}}>Para sincronizar, cada partido debe tener su <code style={s.code}>api_fixture_id</code>. Consúltalo así:<br/><code style={s.code}>GET /fixtures?league=1&season=2026</code></p>
+          <p style={s.hint}>Registrate en dashboard.api-football.com, copia tu API key y pegala aqui.</p>
+          <input style={s.input} type="text" placeholder="Tu API key" value={apiKey} onChange={function(e) { saveApiKey(e.target.value) }} />
+          <p style={{...s.hint, marginTop: 12}}>Cada partido necesita su api_fixture_id para sincronizar automaticamente.</p>
         </div>
       )}
     </div>
@@ -238,7 +248,7 @@ const s = {
   partidoNombre: { fontSize: 13, fontWeight: 600, color: '#F5F0E8' },
   partidoFecha: { fontSize: 11, color: '#888880', marginTop: 2 },
   resultadoBadge: { fontSize: 11, color: '#00C97A', marginTop: 4 },
-  partidoActions: { display: 'flex', gap: 6 },
+  partidoActions: { display: 'flex', gap: 6, flexWrap: 'wrap' },
   btnSm: { padding: '6px 10px', border: '1px solid #222', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: '#161616', color: '#F5F0E8' },
   btnGold: { background: '#C9A84C22', color: '#C9A84C', borderColor: '#C9A84C44' },
   btnWarning: { background: '#1a1200', color: '#C9A84C', borderColor: '#2a2000' },
