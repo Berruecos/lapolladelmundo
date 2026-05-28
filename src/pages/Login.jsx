@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../lib/AuthContext'
+import { supabase } from '../lib/supabase'
 
 export default function Login() {
   const { signIn, signUp } = useAuth()
@@ -7,9 +8,13 @@ export default function Login() {
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resetMode, setResetMode] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetMsg, setResetMsg] = useState('')
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -20,7 +25,7 @@ export default function Login() {
       } else {
         if (!nombre.trim()) throw new Error('Escribe tu nombre')
         await signUp(email, password, nombre.trim())
-        setMsg('Revisa tu correo para confirmar tu cuenta.')
+        setMsg('Cuenta creada. Ya puedes iniciar sesión.')
         setMode('login')
       }
     } catch (err) {
@@ -29,6 +34,51 @@ export default function Login() {
       setLoading(false)
     }
   }
+
+  async function handleReset(e) {
+    e.preventDefault()
+    setResetMsg(''); setLoading(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: 'https://lapolladelmundo.vercel.app',
+    })
+    if (error) setResetMsg('Error: ' + error.message)
+    else setResetMsg('Te enviamos un correo para restablecer tu contraseña. Revisa tu bandeja.')
+    setLoading(false)
+  }
+
+  if (resetMode) return (
+    <div style={s.page}>
+      <div style={s.bg} />
+      <div style={s.card}>
+        <div style={s.logoArea}>
+          <div style={s.trophyWrap}>
+            <div style={s.trophyGlow} />
+            <img src="/—Pngtree—fifa world cup trophy_8873382.png" alt="Trofeo" style={s.trophyImg}
+              onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='block' }} />
+            <span style={{display:'none', fontSize:52}}>🏆</span>
+          </div>
+          <div style={s.title}>LA POLLA DEL</div>
+          <div style={s.titleGold}>MUNDO 2026</div>
+        </div>
+
+        <div style={{...s.label, marginBottom: 12, color: '#F5F0E8', fontSize: 13}}>RECUPERAR CONTRASEÑA</div>
+        <form onSubmit={handleReset} style={s.form}>
+          <div style={s.field}>
+            <label style={s.label}>TU CORREO</label>
+            <input style={s.input} type="email" placeholder="tucorreo@gmail.com"
+              value={resetEmail} onChange={e => setResetEmail(e.target.value)} required />
+          </div>
+          {resetMsg && <div style={resetMsg.includes('Error') ? s.error : s.success}>{resetMsg}</div>}
+          <button style={{...s.btn, opacity: loading ? 0.7 : 1}} type="submit" disabled={loading}>
+            {loading ? 'ENVIANDO...' : 'ENVIAR CORREO'}
+          </button>
+          <button type="button" style={s.backBtn} onClick={() => { setResetMode(false); setResetMsg('') }}>
+            ← Volver al login
+          </button>
+        </form>
+      </div>
+    </div>
+  )
 
   return (
     <div style={s.page}>
@@ -76,9 +126,20 @@ export default function Login() {
           </div>
           <div style={s.field}>
             <label style={s.label}>CONTRASEÑA</label>
-            <input style={s.input} type="password" placeholder="Mínimo 6 caracteres"
-              value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+            <div style={s.passWrap}>
+              <input style={{...s.input, ...s.passInput}} type={showPass ? 'text' : 'password'}
+                placeholder="Mínimo 6 caracteres"
+                value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+              <button type="button" style={s.eyeBtn} onClick={() => setShowPass(!showPass)}>
+                {showPass ? '🙈' : '👁'}
+              </button>
+            </div>
           </div>
+          {mode === 'login' && (
+            <button type="button" style={s.forgotBtn} onClick={() => { setResetMode(true); setResetEmail(email) }}>
+              ¿Olvidaste tu contraseña?
+            </button>
+          )}
           {error && <div style={s.error}>{error}</div>}
           {msg && <div style={s.success}>{msg}</div>}
           <button style={{...s.btn, opacity: loading ? 0.7 : 1}} type="submit" disabled={loading}>
@@ -98,17 +159,22 @@ const s = {
   trophyWrap: { position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   trophyGlow: { position: 'absolute', width: 120, height: 120, borderRadius: '50%', background: 'radial-gradient(circle, #C9A84C33 0%, transparent 70%)', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
   trophyImg: { width: 110, height: 'auto', position: 'relative', zIndex: 1, filter: 'drop-shadow(0 4px 20px #C9A84C66)' },
-  title: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 32, fontWeight: 900, letterSpacing: 4, color: '#F5F0E8', lineHeight: 1 },
-  titleGold: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 36, fontWeight: 900, letterSpacing: 4, color: '#C9A84C', lineHeight: 1, marginBottom: 8 },
+  title: { fontFamily: "'Arial Black', sans-serif", fontSize: 32, fontWeight: 900, letterSpacing: 4, color: '#F5F0E8', lineHeight: 1 },
+  titleGold: { fontFamily: "'Arial Black', sans-serif", fontSize: 36, fontWeight: 900, letterSpacing: 4, color: '#C9A84C', lineHeight: 1, marginBottom: 8 },
   subtitle: { fontSize: 11, letterSpacing: 3, color: '#888880', fontWeight: 500 },
   tabs: { display: 'flex', borderBottom: '1px solid #222', marginBottom: '1.5rem' },
-  tab: { flex: 1, background: 'none', border: 'none', borderBottom: '2px solid transparent', padding: '10px', fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: 'pointer', color: '#444', marginBottom: -1, transition: 'all .2s', fontFamily: "'Barlow Condensed', sans-serif" },
+  tab: { flex: 1, background: 'none', border: 'none', borderBottom: '2px solid transparent', padding: '10px', fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: 'pointer', color: '#444', marginBottom: -1, transition: 'all .2s', fontFamily: "'Arial Black', sans-serif" },
   tabActive: { color: '#C9A84C', borderBottomColor: '#C9A84C' },
   form: { display: 'flex', flexDirection: 'column', gap: 14 },
   field: { display: 'flex', flexDirection: 'column', gap: 6 },
   label: { fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#888880' },
-  input: { padding: '12px 14px', background: '#161616', border: '1px solid #222', borderRadius: 8, fontSize: 14, color: '#F5F0E8', outline: 'none', transition: 'border .2s' },
-  btn: { padding: '14px', background: 'linear-gradient(135deg, #C9A84C, #8a6d2a)', color: '#0a0a0a', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 900, letterSpacing: 2, cursor: 'pointer', marginTop: 4, fontFamily: "'Barlow Condensed', sans-serif" },
+  input: { padding: '12px 14px', background: '#161616', border: '1px solid #222', borderRadius: 8, fontSize: 14, color: '#F5F0E8', outline: 'none' },
+  passWrap: { position: 'relative', display: 'flex', alignItems: 'center' },
+  passInput: { flex: 1, paddingRight: 44 },
+  eyeBtn: { position: 'absolute', right: 12, background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 0 },
+  forgotBtn: { background: 'none', border: 'none', color: '#C9A84C', fontSize: 12, cursor: 'pointer', textAlign: 'right', padding: 0, marginTop: -8, fontWeight: 500 },
+  btn: { padding: '14px', background: 'linear-gradient(135deg, #C9A84C, #8a6d2a)', color: '#0a0a0a', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 900, letterSpacing: 2, cursor: 'pointer', marginTop: 4, fontFamily: "'Arial Black', sans-serif" },
+  backBtn: { background: 'none', border: 'none', color: '#888880', fontSize: 13, cursor: 'pointer', textAlign: 'center', padding: '8px 0', marginTop: 4 },
   error: { color: '#FF2D2D', fontSize: 12, padding: '10px 12px', background: '#1a0808', borderRadius: 6, border: '1px solid #7a0f0f' },
   success: { color: '#00C97A', fontSize: 12, padding: '10px 12px', background: '#001a0f', borderRadius: 6, border: '1px solid #005a30' },
 }

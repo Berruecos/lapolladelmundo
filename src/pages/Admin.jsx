@@ -57,7 +57,18 @@ export default function Admin({ participante }) {
     else { showMsg('Resultado guardado y puntos calculados ✓'); fetchPartidos() }
   }
 
-  async function syncDesdeAPI(partido) {
+  async function eliminarPartido(partido) {
+    if (!confirm(`¿Eliminar ${partido.equipo_local} vs ${partido.equipo_visita}?`)) return
+    await supabase.from('partidos').delete().eq('id', partido.id)
+    showMsg('Partido eliminado ✓')
+    fetchPartidos()
+  }
+
+  async function ocultarPartido(partido) {
+    await supabase.from('partidos').update({ estado: partido.estado === 'oculto' ? 'pendiente' : 'oculto' }).eq('id', partido.id)
+    showMsg(partido.estado === 'oculto' ? 'Partido visible ✓' : 'Partido oculto ✓')
+    fetchPartidos()
+  }
     if (!apiKey) { showMsg('Primero agrega tu API key'); return }
     setSyncing(true)
     try {
@@ -145,6 +156,10 @@ export default function Admin({ participante }) {
                     {syncing ? '...' : 'Sync API'}
                   </button>
                 )}
+                <button style={{...s.btnSm, ...s.btnWarning}} onClick={() => ocultarPartido(p)}>
+                  {p.estado === 'oculto' ? '👁 Mostrar' : '🙈 Ocultar'}
+                </button>
+                <button style={{...s.btnSm, ...s.btnDanger}} onClick={() => eliminarPartido(p)}>🗑</button>
               </div>
             </div>
           ))}
@@ -201,6 +216,8 @@ const s = {
   partidoActions: { display: 'flex', gap: 6 },
   btnSm: { padding: '6px 10px', border: '1px solid #222', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: '#161616', color: '#F5F0E8' },
   btnGold: { background: '#C9A84C22', color: '#C9A84C', borderColor: '#C9A84C44' },
+  btnWarning: { background: '#1a1200', color: '#C9A84C', borderColor: '#2a2000' },
+  btnDanger: { background: '#1a0808', color: '#FF2D2D', borderColor: '#7a0f0f' },
   partRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#111', border: '1px solid #1e1e1e', borderRadius: 10, padding: '10px 14px', marginBottom: 8 },
   partInfo: { flex: 1 },
   partNombre: { fontSize: 14, fontWeight: 600, color: '#F5F0E8', display: 'flex', alignItems: 'center', gap: 6 },

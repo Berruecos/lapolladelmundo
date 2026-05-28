@@ -35,7 +35,7 @@ export default function Pronosticos({ participante }) {
     setLoading(true)
 
     const { data: ps } = await supabase
-      .from('partidos').select('*').eq('ronda', ronda).order('fecha_hora')
+      .from('partidos').select('*').eq('ronda', ronda).neq('estado', 'oculto').order('fecha_hora')
 
     const ids = (ps || []).map(p => p.id)
 
@@ -162,6 +162,7 @@ export default function Pronosticos({ participante }) {
                     value={pr.scorer || ''} disabled={bloqueado}
                     onChange={e => updateProno(p.id, 'scorer', e.target.value)}>
                     <option value="">— Selecciona jugador —</option>
+                    <option value="autogol">🙃 Autogol</option>
                     <optgroup label={p.equipo_local}>
                       {jugLocal.map(j => <option key={j} value={j}>{j}</option>)}
                     </optgroup>
