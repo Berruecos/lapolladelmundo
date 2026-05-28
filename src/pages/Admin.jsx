@@ -52,8 +52,14 @@ export default function Admin({ participante }) {
       .in('equipo', [partido.equipo_local, partido.equipo_visita])
       .order('numero')
 
-    const opciones = ['autogol', ...(jugs || []).map(j => j.numero ? `${j.numero} · ${j.nombre}` : j.nombre)]
-    const seleccion = prompt(`Primer anotador:
+ const opciones = ['autogol', ...(jugs || []).map(j => j.numero ? j.numero + ' · ' + j.nombre : j.nombre)]
+    const lista = opciones.map((o,i) => i + ': ' + o).join('\n')
+    const seleccion = prompt('Primer anotador:\n' + lista + '\n\nEscribe el número:')
+    if (seleccion === null) return
+    const idx = parseInt(seleccion)
+    const scorer = !isNaN(idx) && opciones[idx]
+      ? (idx === 0 ? 'autogol' : (jugs || [])[idx - 1]?.nombre || opciones[idx])
+      : seleccion
 ${opciones.map((o,i) => `${i}: ${o}`).join('
 ')}
 
