@@ -69,7 +69,7 @@ export default function Admin({ participante }) {
     showMsg(partido.estado === 'oculto' ? 'Partido visible ✓' : 'Partido oculto ✓')
     fetchPartidos()
   }
-    if (!apiKey) { showMsg('Primero agrega tu API key'); return }
+    async function syncDesdeAPI(partido) { if (!apiKey) { showMsg('Primero agrega tu API key'); return }
     setSyncing(true)
     try {
       const res = await fetch(`https://v3.football.api-sports.io/fixtures?id=${partido.api_fixture_id}`, {
