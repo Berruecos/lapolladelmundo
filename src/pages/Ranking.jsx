@@ -243,7 +243,18 @@ export default function Ranking({ participante }) {
                     {isMe && <span style={s.meBadge}>TÚ</span>}
                   </div>
                   <div style={s.breakdown}>
-                    ⚽ {p.pts_marcador} · 👤 {p.pts_anotador} · ✅ {p.pts_resultado}
+                    <span style={{color:'#C9A84C'}}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign:'middle', marginRight:2}}><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                      {p.pts_marcador}
+                    </span>
+                    <span style={{color:'#1E6FFF', margin:'0 6px'}}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1E6FFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign:'middle', marginRight:2}}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      {p.pts_anotador}
+                    </span>
+                    <span style={{color:'#00C97A'}}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#00C97A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign:'middle', marginRight:2}}><polyline points="20 6 9 17 4 12"/></svg>
+                      {p.pts_resultado}
+                    </span>
                   </div>
                 </div>
                 <div style={s.pts}>
