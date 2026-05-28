@@ -45,7 +45,7 @@ export default function Pronosticos({ participante }) {
       .in('partido_id', ids.length ? ids : [0])
 
     const { data: jugs } = await supabase
-      .from('jugadores').select('*')
+      .from('jugadores').select('nombre, numero, equipo')
       .in('equipo', (ps || []).flatMap(p => [p.equipo_local, p.equipo_visita]))
 
     const pronosMap = {}
@@ -58,7 +58,10 @@ export default function Pronosticos({ participante }) {
     const jugsMap = {}
     ;(jugs || []).forEach(j => {
       if (!jugsMap[j.equipo]) jugsMap[j.equipo] = []
-      jugsMap[j.equipo].push(j.nombre)
+      jugsMap[j.equipo].push({ nombre: j.nombre, numero: j.numero })
+    })
+    Object.keys(jugsMap).forEach(eq => {
+      jugsMap[eq].sort((a, b) => (a.numero || 99) - (b.numero || 99))
     })
 
     setPartidos(ps || [])
@@ -162,12 +165,12 @@ export default function Pronosticos({ participante }) {
                     value={pr.scorer || ''} disabled={bloqueado}
                     onChange={e => updateProno(p.id, 'scorer', e.target.value)}>
                     <option value="">— Selecciona jugador —</option>
-                    <option value="autogol">🙃 Autogol</option>
+                    <option value="autogol">Autogol</option>
                     <optgroup label={p.equipo_local}>
-                      {jugLocal.map(j => <option key={j} value={j}>{j}</option>)}
+                      {jugLocal.map(j => <option key={j.nombre} value={j.nombre}>{j.numero ? `${j.numero} · ${j.nombre}` : j.nombre}</option>)}
                     </optgroup>
                     <optgroup label={p.equipo_visita}>
-                      {jugVisita.map(j => <option key={j} value={j}>{j}</option>)}
+                      {jugVisita.map(j => <option key={j.nombre} value={j.nombre}>{j.numero ? `${j.numero} · ${j.nombre}` : j.nombre}</option>)}
                     </optgroup>
                   </select>
                 ) : (
