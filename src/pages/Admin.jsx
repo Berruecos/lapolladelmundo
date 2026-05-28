@@ -45,8 +45,25 @@ export default function Admin({ participante }) {
   async function registrarResultado(partido) {
     const local = parseInt(prompt(`Goles de ${partido.equipo_local}:`))
     const visita = parseInt(prompt(`Goles de ${partido.equipo_visita}:`))
-    const scorer = prompt('Primer anotador (nombre exacto o "autogol"):')
     if (isNaN(local) || isNaN(visita)) return
+
+    const { data: jugs } = await supabase
+      .from('jugadores').select('nombre, numero')
+      .in('equipo', [partido.equipo_local, partido.equipo_visita])
+      .order('numero')
+
+    const opciones = ['autogol', ...(jugs || []).map(j => j.numero ? `${j.numero} · ${j.nombre}` : j.nombre)]
+    const seleccion = prompt(`Primer anotador:
+${opciones.map((o,i) => `${i}: ${o}`).join('
+')}
+
+Escribe el número:`)
+    if (seleccion === null) return
+    const idx = parseInt(seleccion)
+    const scorer = !isNaN(idx) && opciones[idx]
+      ? (idx === 0 ? 'autogol' : (jugs || [])[idx - 1]?.nombre || opciones[idx])
+      : seleccion
+
     const { error } = await supabase.rpc('registrar_resultado', {
       p_partido_id: partido.id,
       p_goles_local: local,
@@ -69,7 +86,9 @@ export default function Admin({ participante }) {
     showMsg(partido.estado === 'oculto' ? 'Partido visible ✓' : 'Partido oculto ✓')
     fetchPartidos()
   }
-    async function syncDesdeAPI(partido) { if (!apiKey) { showMsg('Primero agrega tu API key'); return }
+
+  async function syncDesdeAPI(partido) {
+    if (!apiKey) { showMsg('Primero agrega tu API key'); return }
     setSyncing(true)
     try {
       const res = await fetch(`https://v3.football.api-sports.io/fixtures?id=${partido.api_fixture_id}`, {
