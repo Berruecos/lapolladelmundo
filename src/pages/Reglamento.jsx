@@ -1,76 +1,66 @@
-export default function Reglamento() {
-  const puntos = [
-    { ronda: 'R1', fase: 'Grupos', marcador: 3, anotador: 2, resultado: 1 },
-    { ronda: 'R2', fase: 'Dieciseisavos', marcador: 6, anotador: 4, resultado: 2 },
-    { ronda: 'R3', fase: 'Octavos', marcador: 10, anotador: 6, resultado: 4 },
-    { ronda: 'R4', fase: 'Cuartos', marcador: 15, anotador: 9, resultado: 6 },
-    { ronda: 'R5', fase: 'Semifinales', marcador: 20, anotador: 12, resultado: 8 },
-    { ronda: 'R6', fase: 'Final', marcador: 30, anotador: 18, resultado: 12 },
-  ]
+bash
 
-  const reglas = [
-    { icon: '⏰', titulo: 'Deadline', texto: 'Pronósticos antes de las 23:59 del día anterior a cada fecha. Si no enviaste, recibes 0–0 autogol automático.' },
-    { icon: '🔒', titulo: 'No editable', texto: 'Una vez enviado tu pronóstico, queda bloqueado. No se puede modificar.' },
-    { icon: '1️⃣', titulo: 'Solo una vez', texto: 'El pronóstico se envía una sola vez por partido.' },
-    { icon: '🧮', titulo: 'Marcador exacto', texto: 'No acumula con acertar resultado. Solo se toma el mayor puntaje.' },
-    { icon: '⏱️', titulo: 'Tiempo reglamentario', texto: 'Marcadores válidos solo a los 90 minutos.' },
-    { icon: '🥅', titulo: '0-0 en tiempo extra', texto: 'El primer anotador es el que anote en prórroga o el primer penalti.' },
-    { icon: '🙃', titulo: 'Autogol', texto: 'Si el primer gol es autogol, nadie gana puntos por anotador.' },
-    { icon: '🚫', titulo: '3° y 4° puesto', texto: 'No suma puntos.' },
-  ]
+cd /home/claude/polla2026v2/src && python3 -c "
+content = open('App.jsx').read()
 
-  return (
-    <div style={s.page}>
-      <div style={s.titleArea}>
-        <div style={s.sectionTitle}>TABLA DE PUNTOS</div>
-      </div>
+old = '''const TABS = [
+  { id: 'ranking', label: 'TABLA', icon: '🏆' },
+  { id: 'pronosticos', label: 'PICKS', icon: '⚽' },
+  { id: 'rivales', label: 'RIVALES', icon: '👀' },
+  { id: 'reglamento', label: 'REGLAS', icon: '📋' },
+  { id: 'admin', label: 'ADMIN', icon: '⚙️', adminOnly: true },
+]'''
 
-      <div style={s.tableWrap}>
-        <div style={s.tableHeader}>
-          <span style={s.th}>FASE</span>
-          <span style={{...s.th, textAlign:'center'}}>MARCADOR</span>
-          <span style={{...s.th, textAlign:'center'}}>ANOTADOR</span>
-          <span style={{...s.th, textAlign:'center'}}>RESULTADO</span>
-        </div>
-        {puntos.map((p, i) => (
-          <div key={p.ronda} style={{...s.tableRow, background: i % 2 === 0 ? '#111' : '#0f0f0f'}}>
-            <span style={s.tdFase}>{p.fase}</span>
-            <span style={{...s.tdPts, color: '#C9A84C'}}>{p.marcador}</span>
-            <span style={{...s.tdPts, color: '#1E6FFF'}}>{p.anotador}</span>
-            <span style={{...s.tdPts, color: '#00C97A'}}>{p.resultado}</span>
-          </div>
-        ))}
-      </div>
-
-      <div style={{...s.sectionTitle, marginTop: '1.5rem'}}>REGLAS</div>
-      <div style={s.reglasList}>
-        {reglas.map((r, i) => (
-          <div key={i} style={s.regla}>
-            <span style={s.reglaIcon}>{r.icon}</span>
-            <div>
-              <div style={s.reglaTitulo}>{r.titulo}</div>
-              <div style={s.reglaTexto}>{r.texto}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+new = '''const TabIcon = ({ id, active }) => {
+  const color = active ? '#C9A84C' : '#444440'
+  if (id === 'ranking') return (
+    <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke={color} strokeWidth=\"2\" strokeLinecap=\"round\" strokeLinejoin=\"round\">
+      <path d=\"M6 9H4.5a2.5 2.5 0 0 1 0-5H6\"/><path d=\"M18 9h1.5a2.5 2.5 0 0 0 0-5H18\"/>
+      <path d=\"M4 22h16\"/><path d=\"M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22\"/>
+      <path d=\"M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22\"/>
+      <path d=\"M18 2H6v7a6 6 0 0 0 12 0V2z\"/>
+    </svg>
   )
+  if (id === 'pronosticos') return (
+    <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke={color} strokeWidth=\"2\" strokeLinecap=\"round\" strokeLinejoin=\"round\">
+      <circle cx=\"12\" cy=\"12\" r=\"10\"/>
+      <path d=\"M12 8v4l3 3\"/>
+    </svg>
+  )
+  if (id === 'rivales') return (
+    <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke={color} strokeWidth=\"2\" strokeLinecap=\"round\" strokeLinejoin=\"round\">
+      <path d=\"M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/>
+      <path d=\"M23 21v-2a4 4 0 0 0-3-3.87\"/><path d=\"M16 3.13a4 4 0 0 1 0 7.75\"/>
+    </svg>
+  )
+  if (id === 'reglamento') return (
+    <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke={color} strokeWidth=\"2\" strokeLinecap=\"round\" strokeLinejoin=\"round\">
+      <path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z\"/>
+      <polyline points=\"14 2 14 8 20 8\"/><line x1=\"16\" y1=\"13\" x2=\"8\" y2=\"13\"/>
+      <line x1=\"16\" y1=\"17\" x2=\"8\" y2=\"17\"/><polyline points=\"10 9 9 9 8 9\"/>
+    </svg>
+  )
+  if (id === 'admin') return (
+    <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke={color} strokeWidth=\"2\" strokeLinecap=\"round\" strokeLinejoin=\"round\">
+      <circle cx=\"12\" cy=\"12\" r=\"3\"/>
+      <path d=\"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z\"/>
+    </svg>
+  )
+  return null
 }
 
-const s = {
-  page: { padding: '1rem 0' },
-  titleArea: { marginBottom: '0.75rem' },
-  sectionTitle: { fontSize: 11, letterSpacing: 3, fontWeight: 700, color: '#C9A84C', marginBottom: '0.75rem' },
-  tableWrap: { borderRadius: 12, overflow: 'hidden', border: '1px solid #1e1e1e', marginBottom: '0.5rem' },
-  tableHeader: { display: 'flex', background: '#161616', padding: '8px 14px', gap: 8 },
-  th: { flex: 1, fontSize: 9, fontWeight: 700, letterSpacing: 2, color: '#444440' },
-  tableRow: { display: 'flex', padding: '10px 14px', gap: 8, alignItems: 'center' },
-  tdFase: { flex: 1, fontSize: 13, fontWeight: 600, color: '#F5F0E8' },
-  tdPts: { flex: 1, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900, textAlign: 'center' },
-  reglasList: { display: 'flex', flexDirection: 'column', gap: 8 },
-  regla: { display: 'flex', gap: 12, background: '#111', border: '1px solid #1e1e1e', borderRadius: 10, padding: '12px 14px' },
-  reglaIcon: { fontSize: 20, flexShrink: 0 },
-  reglaTitulo: { fontSize: 13, fontWeight: 700, color: '#F5F0E8', marginBottom: 2 },
-  reglaTexto: { fontSize: 12, color: '#888880', lineHeight: 1.5 },
-}
+const TABS = [
+  { id: 'ranking', label: 'TABLA', adminOnly: false },
+  { id: 'pronosticos', label: 'PICKS', adminOnly: false },
+  { id: 'rivales', label: 'RIVALES', adminOnly: false },
+  { id: 'reglamento', label: 'REGLAS', adminOnly: false },
+  { id: 'admin', label: 'ADMIN', adminOnly: true },
+]'''
+
+if old in content:
+    print('FOUND tabs')
+    content = content.replace(old, new)
+    open('App.jsx', 'w').write(content)
+else:
+    print('NOT FOUND')
+"
