@@ -63,4 +63,3 @@ if old in content:
     open('App.jsx', 'w').write(content)
 else:
     print('NOT FOUND')
-"
