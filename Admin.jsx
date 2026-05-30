@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 const RONDAS = ['R1','R2','R3','R4','R5','R6']
 const FASES = { R1:'Fase de grupos', R2:'Dieciseisavos', R3:'Octavos', R4:'Cuartos', R5:'Semifinales', R6:'Final' }
 
-export default function Admin({ participante }) {
+export default function Admin({ participante }) { 
   const [tab, setTab] = useState('partidos')
   const [partidos, setPartidos] = useState([])
   const [participantes, setParticipantes] = useState([])
