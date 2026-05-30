@@ -151,7 +151,7 @@ export default function Login() {
 
 function LogoArea() {
   const [logoUrl, setLogoUrl] = useState(null)
-  useState(() => {
+  useEffect(() => {
     import('../lib/supabase').then(({ supabase }) => {
       supabase.from('configuracion').select('valor').eq('clave', 'logo_url').single()
         .then(({ data }) => { if (data) setLogoUrl(data.valor) })
