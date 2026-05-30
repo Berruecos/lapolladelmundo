@@ -53,7 +53,7 @@ export default function Login() {
         <div style={s.logoArea}>
           <div style={s.trophyWrap}>
             <div style={s.trophyGlow} />
-            <img src="/—Pngtree—fifa world cup trophy_8873382.png" alt="Trofeo" style={s.trophyImg}
+            <img src="/trophy.png" alt="Trofeo" style={s.trophyImg}
               onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='block' }} />
             <span style={{display:'none', fontSize:52}}>🏆</span>
           </div>
