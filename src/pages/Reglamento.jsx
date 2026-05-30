@@ -1,6 +1,3 @@
-bash
-
-cat > /home/claude/polla2026v2/src/pages/Reglamento.jsx << 'ENDOFFILE'
 const IconClock = ({color}) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -116,5 +113,3 @@ const s = {
   reglaTitulo: { fontSize: 13, fontWeight: 700, color: '#F5F0E8', marginBottom: 2 },
   reglaTexto: { fontSize: 12, color: '#888880', lineHeight: 1.5 },
 }
-ENDOFFILE
-echo "done"
