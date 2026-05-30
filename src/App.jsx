@@ -54,6 +54,13 @@ const TABS = [
 ]
 
 export default function App() {
+  const [logoUrl, setLogoUrl] = useState(null)
+  useEffect(() => {
+    import('./lib/supabase').then(({ supabase }) => {
+      supabase.from('configuracion').select('valor').eq('clave', 'logo_url').single()
+        .then(({ data }) => { if (data) setLogoUrl(data.valor) })
+    })
+  }, [])
   const { user, participante, loading, signOut } = useAuth()
   const [tab, setTab] = useState('ranking')
 
@@ -83,9 +90,12 @@ export default function App() {
   return (
     <div style={s.app}>
       <div style={s.header}>
-        <div>
-          <div style={s.headerTitle}>LA POLLA DEL MUNDO</div>
-          <div style={s.headerSub}>2026 · {participante.nombre}</div>
+        <div style={{display:"flex", alignItems:"center", gap: 8}}>
+          {logoUrl && <img src={logoUrl} alt="logo" style={{width: 28, height: 28, objectFit: "contain", filter: "drop-shadow(0 2px 6px #C9A84C66)"}} />}
+          <div>
+            <div style={s.headerTitle}>LA POLLA DEL MUNDO</div>
+            <div style={s.headerSub}>2026 · {participante.nombre}</div>
+          </div>
         </div>
         <button style={s.signOut} onClick={signOut}>SALIR</button>
       </div>
