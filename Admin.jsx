@@ -175,6 +175,8 @@ export default function Admin({ participante }) {
     }
     setSyncingAll(false)
   }
+
+  async function syncDesdeAPI(partido) {
     if (!apiKey) { showMsg('Primero agrega tu API key'); return }
     setSyncing(true)
     try {
