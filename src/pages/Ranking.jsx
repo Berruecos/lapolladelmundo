@@ -67,9 +67,8 @@ const cd = {
 
 function ProximosPartidos() {
   const [partidos, setPartidos] = useState([])
-
   useEffect(() => {
-    supabase.from('partidos').select('*').order('fecha_hora').limit(10).then(({data}) => setPartidos(data || []))
+    supabase.from('partidos').select('*').neq('estado','oculto').order('fecha_hora').limit(10).then(({data}) => setPartidos(data || []))
   }, [])
 
   const ahora = new Date()
@@ -85,9 +84,9 @@ function ProximosPartidos() {
     const hoy = new Date()
     const man = new Date(); man.setDate(hoy.getDate()+1)
     const hora = d.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'})
-    if (d.toDateString() === hoy.toDateString()) return `Hoy · ${hora}`
-    if (d.toDateString() === man.toDateString()) return `Mañana · ${hora}`
-    return d.toLocaleDateString('es-CO', {weekday:'short', day:'numeric', month:'short'}) + ` · ${hora}`
+    if (d.toDateString() === hoy.toDateString()) return 'Hoy · ' + hora
+    if (d.toDateString() === man.toDateString()) return 'Mañana · ' + hora
+    return d.toLocaleDateString('es-CO', {weekday:'short', day:'numeric', month:'short'}) + ' · ' + hora
   }
 
   const rondaLabel = r => ({R1:'Grupos',R2:'16avos',R3:'Octavos',R4:'Cuartos',R5:'Semis',R6:'Final'})[r] || r
@@ -104,12 +103,11 @@ function ProximosPartidos() {
           </div>
           <div style={pp.matchRow}>
             <span style={pp.team}>{p.equipo_local}</span>
-            <div style={pp.liveScore}>{p.goles_local ?? '–'} : {p.goles_visita ?? '–'}</div>
+            <div style={pp.liveScore}>{p.goles_local != null ? p.goles_local : '–'} : {p.goles_visita != null ? p.goles_visita : '–'}</div>
             <span style={{...pp.team, textAlign:'right'}}>{p.equipo_visita}</span>
           </div>
         </div>
       ))}
-
       {proximos.length > 0 && (
         <>
           <div style={pp.sectionTitle}>PRÓXIMOS PARTIDOS</div>
@@ -136,7 +134,7 @@ const pp = {
   sectionTitle: { fontSize: 10, letterSpacing: 3, color: '#888880', fontWeight: 700, marginBottom: 8 },
   liveCard: { background: 'linear-gradient(135deg, #1a0808, #0a0a0a)', border: '1px solid #7a0f0f', borderRadius: 12, padding: '12px 14px', marginBottom: 8 },
   liveHeader: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
-  liveDot: { width: 8, height: 8, borderRadius: '50%', background: '#FF2D2D', display: 'inline-block', animation: 'pulse-red 1.5s infinite' },
+  liveDot: { width: 8, height: 8, borderRadius: '50%', background: '#FF2D2D', display: 'inline-block' },
   liveLabel: { fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#FF2D2D' },
   liveScore: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 900, color: '#FF2D2D', minWidth: 70, textAlign: 'center' },
   card: { background: '#111', border: '1px solid #1e1e1e', borderRadius: 12, padding: '10px 14px', marginBottom: 8 },
@@ -152,7 +150,6 @@ export default function Ranking({ participante }) {
   const [ranking, setRanking] = useState([])
   const [ronda, setRonda] = useState('total')
   const [loading, setLoading] = useState(true)
-  const [totalPart, setTotalPart] = useState(0)
 
   useEffect(() => { fetchRanking() }, [ronda])
 
@@ -160,39 +157,40 @@ export default function Ranking({ participante }) {
     setLoading(true)
     const { data } = await supabase
       .from('participantes')
-      .select(`id, nombre, puntos(total, pts_marcador, pts_anotador, pts_resultado, partido_id, partidos(ronda, fecha_hora))`)
+      .select('id, nombre, activo, puntos(total, pts_marcador, pts_anotador, pts_resultado, partido_id, partidos(ronda, fecha_hora))')
 
     if (!data) { setLoading(false); return }
-    setTotalPart(data.length)
-
     const hoy = new Date().toDateString()
 
     const lista = data.map(p => {
       let puntosFiltrados = p.puntos || []
       if (ronda === 'dia') {
-        puntosFiltrados = puntosFiltrados.filter(pu => {
-          const f = pu.partidos?.fecha_hora
-          return f && new Date(f).toDateString() === hoy
-        })
+        puntosFiltrados = puntosFiltrados.filter(pu => pu.partidos?.fecha_hora && new Date(pu.partidos.fecha_hora).toDateString() === hoy)
       } else if (ronda !== 'total') {
         puntosFiltrados = puntosFiltrados.filter(pu => pu.partidos?.ronda === ronda)
       }
       return {
         id: p.id,
         nombre: p.nombre,
+        activo: p.activo,
         total: puntosFiltrados.reduce((s, pu) => s + (pu.total || 0), 0),
         pts_marcador: puntosFiltrados.reduce((s, pu) => s + (pu.pts_marcador || 0), 0),
         pts_anotador: puntosFiltrados.reduce((s, pu) => s + (pu.pts_anotador || 0), 0),
         pts_resultado: puntosFiltrados.reduce((s, pu) => s + (pu.pts_resultado || 0), 0),
       }
-    }).sort((a, b) => b.total - a.total)
+    })
 
-    setRanking(lista)
+    // Activos primero ordenados por puntos, inactivos al final
+    const activos = lista.filter(p => p.activo).sort((a, b) => b.total - a.total)
+    const inactivos = lista.filter(p => !p.activo).sort((a, b) => b.total - a.total)
+
+    setRanking([...activos, ...inactivos])
     setLoading(false)
   }
 
-  const myPos = ranking.findIndex(r => r.id === participante?.id) + 1
-  const myPts = ranking.find(r => r.id === participante?.id)?.total || 0
+  const activos = ranking.filter(p => p.activo)
+  const myPos = activos.findIndex(r => r.id === participante?.id) + 1
+  const myData = ranking.find(r => r.id === participante?.id)
 
   return (
     <div style={s.page}>
@@ -202,17 +200,17 @@ export default function Ranking({ participante }) {
       <div style={s.myCard}>
         <div style={s.myLeft}>
           <div style={s.myLabel}>TU POSICIÓN</div>
-          <div style={s.myPos}>{myPos || '–'}</div>
+          <div style={s.myPos}>{myData?.activo ? (myPos || '–') : '–'}</div>
         </div>
         <div style={s.myDivider} />
         <div style={s.myRight}>
           <div style={s.myLabel}>TUS PUNTOS</div>
-          <div style={s.myPts}>{myPts} <span style={s.myPtsLabel}>PTS</span></div>
+          <div style={s.myPts}>{myData?.total || 0} <span style={s.myPtsLabel}>PTS</span></div>
         </div>
         <div style={s.myDivider} />
         <div style={s.myRight}>
           <div style={s.myLabel}>PARTICIPANTES</div>
-          <div style={s.myPts}>{totalPart}</div>
+          <div style={s.myPts}>{activos.length}</div>
         </div>
       </div>
 
@@ -223,24 +221,31 @@ export default function Ranking({ participante }) {
         ))}
       </div>
 
-      {loading ? (
-        <div style={s.loading}>Cargando...</div>
-      ) : (
+      {loading ? <div style={s.loading}>Cargando...</div> : (
         <div style={s.list}>
           {ranking.map((p, i) => {
+            const isActive = p.activo
+            const activeIndex = activos.findIndex(a => a.id === p.id)
             const initials = p.nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
             const isMe = p.id === participante?.id
-            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null
+            const medal = activeIndex === 0 ? '🥇' : activeIndex === 1 ? '🥈' : activeIndex === 2 ? '🥉' : null
+
             return (
-              <div key={p.id} style={{...s.row, ...(isMe ? s.rowMe : {}), animationDelay: `${i*0.05}s`}} className="fade-up">
-                <div style={s.pos}>{medal || <span style={s.posNum}>{i+1}</span>}</div>
-                <div style={{...s.avatar, background: COLORS[i % COLORS.length] + '22', border: `1px solid ${COLORS[i % COLORS.length]}44`, color: COLORS[i % COLORS.length]}}>
+              <div key={p.id} style={{...s.row, ...(isMe ? s.rowMe : {}), ...(!isActive ? s.rowInactive : {})}}>
+                <div style={s.pos}>
+                  {isActive
+                    ? (medal || <span style={s.posNum}>{activeIndex + 1}</span>)
+                    : <span style={s.posNumInactive}>—</span>
+                  }
+                </div>
+                <div style={{...s.avatar, background: COLORS[i % COLORS.length] + '22', border: '1px solid ' + COLORS[i % COLORS.length] + '44', color: COLORS[i % COLORS.length]}}>
                   {initials}
                 </div>
                 <div style={s.info}>
                   <div style={s.nombre}>
                     {p.nombre}
                     {isMe && <span style={s.meBadge}>TÚ</span>}
+                    {!isActive && <span style={s.inactiveBadge}>INACTIVO</span>}
                   </div>
                   <div style={s.breakdown}>
                     <span style={{color:'#C9A84C'}}>
@@ -287,12 +292,15 @@ const s = {
   list: { display: 'flex', flexDirection: 'column', gap: 6 },
   row: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: '#111', borderRadius: 12, border: '1px solid #1e1e1e' },
   rowMe: { border: '1px solid #C9A84C44', background: '#161200' },
+  rowInactive: { opacity: 0.55 },
   pos: { width: 28, textAlign: 'center', fontSize: 18, flexShrink: 0 },
   posNum: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, color: '#444' },
+  posNumInactive: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700, color: '#333' },
   avatar: { width: 38, height: 38, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0, fontFamily: "'Barlow Condensed', sans-serif" },
   info: { flex: 1, minWidth: 0 },
-  nombre: { fontSize: 15, fontWeight: 600, color: '#F5F0E8', display: 'flex', alignItems: 'center', gap: 6 },
+  nombre: { fontSize: 15, fontWeight: 600, color: '#F5F0E8', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   meBadge: { fontSize: 9, background: '#C9A84C', color: '#0a0a0a', padding: '2px 6px', borderRadius: 100, fontWeight: 900, letterSpacing: 1 },
+  inactiveBadge: { fontSize: 9, background: '#222', color: '#666', padding: '2px 6px', borderRadius: 100, fontWeight: 700, letterSpacing: 1 },
   breakdown: { fontSize: 11, color: '#444440', marginTop: 2 },
   pts: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 22, fontWeight: 900, color: '#F5F0E8', display: 'flex', alignItems: 'baseline', gap: 3 },
   ptsLabel: { fontSize: 11, fontWeight: 400, color: '#444440' },
