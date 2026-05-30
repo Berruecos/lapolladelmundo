@@ -73,6 +73,13 @@ export default function Admin({ participante }) {
     else { showMsg('Resultado guardado y puntos calculados'); fetchPartidos() }
   }
 
+  async function eliminarParticipante(participante) {
+    if (!confirm('Eliminar a ' + participante.nombre + '? Esta acción no se puede deshacer.')) return
+    await supabase.from('participantes').delete().eq('id', participante.id)
+    showMsg('Participante eliminado')
+    fetchParticipantes()
+  }
+
   async function eliminarPartido(partido) {
     if (!confirm('Eliminar ' + partido.equipo_local + ' vs ' + partido.equipo_visita + '?')) return
     await supabase.from('partidos').delete().eq('id', partido.id)
@@ -201,6 +208,7 @@ export default function Admin({ participante }) {
 
       {tab === 'participantes' && (
         <div>
+          <p style={{...s.hint, marginBottom: '1rem'}}>Total: {participantes.length} participantes</p>
           {participantes.map(function(p) {
             return (
               <div key={p.id} style={s.partRow}>
@@ -209,7 +217,11 @@ export default function Admin({ participante }) {
                     {p.nombre}
                     {p.es_admin && <span style={s.adminBadge}>ADMIN</span>}
                   </div>
+                  <div style={{fontSize: 11, color: '#888880', marginTop: 2}}>{p.user_id}</div>
                 </div>
+                {!p.es_admin && (
+                  <button style={{...s.btnSm, ...s.btnDanger}} onClick={function() { eliminarParticipante(p) }}>Eliminar</button>
+                )}
               </div>
             )
           })}
