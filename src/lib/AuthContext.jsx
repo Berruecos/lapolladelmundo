@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase } from './supabase'
 
 const AuthContext = createContext({})
 
@@ -41,17 +41,24 @@ export function AuthProvider({ children }) {
       const { error: pe } = await supabase.from('participantes').insert({
         user_id: data.user.id,
         nombre,
-        pago: false,
         es_admin: false,
+        activo: false, // nuevos usuarios inactivos por defecto
       })
       if (pe) throw pe
     }
     return data
   }
 
-  async function signIn(email, password) {
+  async function signIn(email, password, remember) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
+    if (remember) {
+      localStorage.setItem('polla_email', email)
+      localStorage.setItem('polla_pass', password)
+    } else {
+      localStorage.removeItem('polla_email')
+      localStorage.removeItem('polla_pass')
+    }
   }
 
   async function signOut() {
