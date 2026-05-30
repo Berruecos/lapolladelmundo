@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from './lib/AuthContext'
 import Login from './pages/Login'
 import Ranking from './pages/Ranking'
