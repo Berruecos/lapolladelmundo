@@ -117,7 +117,64 @@ export default function Admin({ participante }) {
     }
   }
 
-  async function syncDesdeAPI(partido) {
+  const [syncingAll, setSyncingAll] = useState(false)
+
+  async function cargarPartidosMundial() {
+    if (!apiKey) { showMsg('Primero agrega tu API key en la pestaña API'); return }
+    if (!confirm('Esto cargará todos los partidos del Mundial 2026 desde la API. ¿Continuar?')) return
+    setSyncingAll(true)
+    showMsg('Cargando partidos del Mundial... esto puede tomar unos segundos')
+
+    try {
+      const res = await fetch('https://v3.football.api-sports.io/fixtures?league=1&season=2026', {
+        headers: { 'x-apisports-key': apiKey }
+      })
+      const data = await res.json()
+      const fixtures = data.response || []
+
+      if (fixtures.length === 0) { showMsg('No se encontraron partidos'); setSyncingAll(false); return }
+
+      // Mapear rondas del Mundial
+      const rondaMap = (round) => {
+        if (round.includes('Group')) return 'R1'
+        if (round.includes('Round of 32') || round.includes('1/16')) return 'R2'
+        if (round.includes('Round of 16') || round.includes('1/8')) return 'R3'
+        if (round.includes('Quarter') || round.includes('1/4')) return 'R4'
+        if (round.includes('Semi') || round.includes('1/2')) return 'R5'
+        if (round.includes('Final') && !round.includes('Semi') && !round.includes('3rd')) return 'R6'
+        return null
+      }
+
+      let insertados = 0
+      let errores = 0
+
+      for (const f of fixtures) {
+        const ronda = rondaMap(f.league.round)
+        if (!ronda) continue // Saltar 3er puesto
+
+        const { error } = await supabase.from('partidos').upsert({
+          api_fixture_id: f.fixture.id,
+          ronda,
+          fase: FASES[ronda],
+          equipo_local: f.teams.home.name,
+          equipo_visita: f.teams.away.name,
+          fecha_hora: f.fixture.date,
+          estado: f.fixture.status.short === 'FT' ? 'finalizado' : 'pendiente',
+          goles_local: f.goals.home,
+          goles_visita: f.goals.away,
+        }, { onConflict: 'api_fixture_id' })
+
+        if (error) errores++
+        else insertados++
+      }
+
+      showMsg(`✓ ${insertados} partidos cargados correctamente${errores > 0 ? ` (${errores} errores)` : ''}`)
+      fetchPartidos()
+    } catch (err) {
+      showMsg('Error: ' + err.message)
+    }
+    setSyncingAll(false)
+  }
     if (!apiKey) { showMsg('Primero agrega tu API key'); return }
     setSyncing(true)
     try {
@@ -177,6 +234,15 @@ export default function Admin({ participante }) {
 
       {tab === 'partidos' && (
         <div>
+          <div style={s.card}>
+            <div style={s.cardTitle}>CARGAR PARTIDOS DEL MUNDIAL</div>
+            <p style={s.hint}>Jala automáticamente todos los 104 partidos del Mundial 2026 desde la API. Si ya existen, los actualiza.</p>
+            <button style={{...s.btn, background: syncingAll ? '#333' : 'linear-gradient(135deg, #1E6FFF, #0d3b8a)'}}
+              onClick={cargarPartidosMundial} disabled={syncingAll}>
+              {syncingAll ? 'CARGANDO...' : '⚡ CARGAR TODOS LOS PARTIDOS DEL MUNDIAL'}
+            </button>
+          </div>
+
           <div style={s.card}>
             <div style={s.cardTitle}>AGREGAR PARTIDO</div>
             <form onSubmit={addPartido} style={s.form}>
