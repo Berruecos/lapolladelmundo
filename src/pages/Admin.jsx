@@ -12,7 +12,6 @@ export default function Admin({ participante }) {
   const [form, setForm] = useState({ local: '', visita: '', fecha_hora: '', ronda: 'R1' })
   const [msg, setMsg] = useState('')
   const [apiKey, setApiKey] = useState(localStorage.getItem('api_football_key') || '')
-  const [syncing, setSyncing] = useState(false)
   const [logoUrl, setLogoUrl] = useState('')
   const [logoInput, setLogoInput] = useState('')
 
@@ -175,38 +174,7 @@ export default function Admin({ participante }) {
     }
     setSyncingAll(false)
   }
-    if (!apiKey) { showMsg('Primero agrega tu API key'); return }
-    setSyncing(true)
-    try {
-      const res = await fetch('https://v3.football.api-sports.io/fixtures?id=' + partido.api_fixture_id, {
-        headers: { 'x-apisports-key': apiKey }
-      })
-      const data = await res.json()
-      const fix = data.response && data.response[0]
-      if (!fix) { showMsg('Partido no encontrado en la API'); setSyncing(false); return }
-      const status = fix.fixture.status.short
-      if (status !== 'FT' && status !== 'AET' && status !== 'PEN') {
-        showMsg('El partido aun no ha terminado'); setSyncing(false); return
-      }
-      const golesLocal = fix.goals.home
-      const golesVisita = fix.goals.away
-      const events = fix.events || []
-      const firstGoal = events.find(function(e) { return e.type === 'Goal' })
-      const isOwnGoal = firstGoal && firstGoal.detail === 'Own Goal'
-      const scorer = isOwnGoal ? 'autogol' : (firstGoal && firstGoal.player && firstGoal.player.name) || null
-      await supabase.rpc('registrar_resultado', {
-        p_partido_id: partido.id,
-        p_goles_local: golesLocal,
-        p_goles_visita: golesVisita,
-        p_primer_anotador: scorer,
-      })
-      showMsg('Sincronizado: ' + golesLocal + '-' + golesVisita + ' · ' + (scorer || 'sin anotador'))
-      fetchPartidos()
-    } catch (err) {
-      showMsg('Error: ' + err.message)
-    }
-    setSyncing(false)
-  }
+
 
   function showMsg(m) { setMsg(m); setTimeout(function() { setMsg('') }, 4000) }
 
@@ -282,11 +250,7 @@ export default function Admin({ participante }) {
                 </div>
                 <div style={s.partidoActions}>
                   <button style={s.btnSm} onClick={function() { registrarResultado(p) }}>Manual</button>
-                  {p.api_fixture_id && (
-                    <button style={{...s.btnSm, ...s.btnGold}} onClick={function() { syncDesdeAPI(p) }} disabled={syncing}>
-                      {syncing ? '...' : 'Sync'}
-                    </button>
-                  )}
+
                   <button style={{...s.btnSm, ...s.btnWarning}} onClick={function() { ocultarPartido(p) }}>
                     {p.estado === 'oculto' ? 'Mostrar' : 'Ocultar'}
                   </button>
