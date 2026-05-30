@@ -8,18 +8,20 @@ export default function Admin({ participante }) {
   const [tab, setTab] = useState('partidos')
   const [partidos, setPartidos] = useState([])
   const [participantes, setParticipantes] = useState([])
-  const [ronda, setRonda] = useState('R1')
+  const [ronda, setRonda] = useState('R6')
   const [form, setForm] = useState({ local: '', visita: '', fecha_hora: '', ronda: 'R1' })
   const [msg, setMsg] = useState('')
   const [apiKey, setApiKey] = useState(localStorage.getItem('api_football_key') || '')
   const [syncing, setSyncing] = useState(false)
+  const [logoUrl, setLogoUrl] = useState('')
+  const [logoInput, setLogoInput] = useState('')
 
   function saveApiKey(key) {
     setApiKey(key)
     localStorage.setItem('api_football_key', key)
   }
 
-  useEffect(() => { fetchPartidos(); fetchParticipantes() }, [ronda])
+  useEffect(() => { fetchPartidos(); fetchParticipantes(); fetchLogo() }, [ronda])
 
   async function fetchPartidos() {
     const { data } = await supabase.from('partidos').select('*').eq('ronda', ronda).order('fecha_hora')
@@ -29,6 +31,17 @@ export default function Admin({ participante }) {
   async function fetchParticipantes() {
     const { data } = await supabase.from('participantes').select('*').order('created_at')
     setParticipantes(data || [])
+  }
+
+  async function fetchLogo() {
+    const { data } = await supabase.from('configuracion').select('valor').eq('clave', 'logo_url').single()
+    if (data) { setLogoUrl(data.valor); setLogoInput(data.valor) }
+  }
+
+  async function saveLogo() {
+    await supabase.from('configuracion').upsert({ clave: 'logo_url', valor: logoInput, updated_at: new Date().toISOString() })
+    setLogoUrl(logoInput)
+    showMsg('Logo actualizado')
   }
 
   async function addPartido(e) {
@@ -73,13 +86,6 @@ export default function Admin({ participante }) {
     else { showMsg('Resultado guardado y puntos calculados'); fetchPartidos() }
   }
 
-  async function eliminarParticipante(participante) {
-    if (!confirm('Eliminar a ' + participante.nombre + '? Esta acción no se puede deshacer.')) return
-    await supabase.from('participantes').delete().eq('id', participante.id)
-    showMsg('Participante eliminado')
-    fetchParticipantes()
-  }
-
   async function eliminarPartido(partido) {
     if (!confirm('Eliminar ' + partido.equipo_local + ' vs ' + partido.equipo_visita + '?')) return
     await supabase.from('partidos').delete().eq('id', partido.id)
@@ -92,6 +98,23 @@ export default function Admin({ participante }) {
     await supabase.from('partidos').update({ estado: nuevoEstado }).eq('id', partido.id)
     showMsg(partido.estado === 'oculto' ? 'Partido visible' : 'Partido oculto')
     fetchPartidos()
+  }
+
+  async function toggleActivo(p) {
+    const nuevoEstado = !p.activo
+    if (nuevoEstado === true) {
+      // Activar: borrar puntos acumulados mientras estaba inactivo
+      if (confirm(p.nombre + ' pasará a ACTIVO y sus puntos acumulados se borrarán. ¿Continuar?')) {
+        await supabase.from('puntos').delete().eq('participante_id', p.id)
+        await supabase.from('participantes').update({ activo: true }).eq('id', p.id)
+        showMsg(p.nombre + ' activado con 0 puntos')
+        fetchParticipantes()
+      }
+    } else {
+      await supabase.from('participantes').update({ activo: false }).eq('id', p.id)
+      showMsg(p.nombre + ' desactivado')
+      fetchParticipantes()
+    }
   }
 
   async function syncDesdeAPI(partido) {
@@ -114,11 +137,12 @@ export default function Admin({ participante }) {
       const firstGoal = events.find(function(e) { return e.type === 'Goal' })
       const isOwnGoal = firstGoal && firstGoal.detail === 'Own Goal'
       const scorer = isOwnGoal ? 'autogol' : (firstGoal && firstGoal.player && firstGoal.player.name) || null
-      await supabase.from('partidos').update({
-        goles_local: golesLocal, goles_visita: golesVisita,
-        primer_anotador: scorer, estado: 'finalizado'
-      }).eq('id', partido.id)
-      await supabase.rpc('calcular_puntos', { p_partido_id: partido.id })
+      await supabase.rpc('registrar_resultado', {
+        p_partido_id: partido.id,
+        p_goles_local: golesLocal,
+        p_goles_visita: golesVisita,
+        p_primer_anotador: scorer,
+      })
       showMsg('Sincronizado: ' + golesLocal + '-' + golesVisita + ' · ' + (scorer || 'sin anotador'))
       fetchPartidos()
     } catch (err) {
@@ -140,7 +164,7 @@ export default function Admin({ participante }) {
   return (
     <div style={s.page}>
       <div style={s.tabs}>
-        {['partidos','participantes','api'].map(function(t) {
+        {['partidos','participantes','logo','api'].map(function(t) {
           return (
             <button key={t} style={tab===t ? {...s.tab, ...s.tabActive} : s.tab} onClick={function() { setTab(t) }}>
               {t.toUpperCase()}
@@ -178,6 +202,8 @@ export default function Admin({ participante }) {
             })}
           </div>
 
+          {partidos.length === 0 && <p style={s.hint}>No hay partidos en esta ronda.</p>}
+
           {partidos.map(function(p) {
             return (
               <div key={p.id} style={s.partidoCard}>
@@ -185,14 +211,14 @@ export default function Admin({ participante }) {
                   <div style={s.partidoNombre}>{p.equipo_local} vs {p.equipo_visita}</div>
                   <div style={s.partidoFecha}>{fmtFecha(p.fecha_hora)}</div>
                   {p.goles_local !== null && (
-                    <div style={s.resultadoBadge}>Resultado: {p.goles_local}-{p.goles_visita} · {p.primer_anotador || 'sin anotador'}</div>
+                    <div style={s.resultadoBadge}>✓ {p.goles_local}-{p.goles_visita} · {p.primer_anotador || 'sin anotador'}</div>
                   )}
                 </div>
                 <div style={s.partidoActions}>
                   <button style={s.btnSm} onClick={function() { registrarResultado(p) }}>Manual</button>
                   {p.api_fixture_id && (
                     <button style={{...s.btnSm, ...s.btnGold}} onClick={function() { syncDesdeAPI(p) }} disabled={syncing}>
-                      {syncing ? '...' : 'Sync API'}
+                      {syncing ? '...' : 'Sync'}
                     </button>
                   )}
                   <button style={{...s.btnSm, ...s.btnWarning}} onClick={function() { ocultarPartido(p) }}>
@@ -208,7 +234,7 @@ export default function Admin({ participante }) {
 
       {tab === 'participantes' && (
         <div>
-          <p style={{...s.hint, marginBottom: '1rem'}}>Total: {participantes.length} participantes</p>
+          <p style={s.hint}>Total: {participantes.length} · Activos: {participantes.filter(p=>p.activo).length}</p>
           {participantes.map(function(p) {
             return (
               <div key={p.id} style={s.partRow}>
@@ -217,14 +243,41 @@ export default function Admin({ participante }) {
                     {p.nombre}
                     {p.es_admin && <span style={s.adminBadge}>ADMIN</span>}
                   </div>
-                  <div style={{fontSize: 11, color: '#888880', marginTop: 2}}>{p.user_id}</div>
+                  <div style={{fontSize: 11, color: p.activo ? '#00C97A' : '#666', marginTop: 2}}>
+                    {p.activo ? 'Activo' : 'Inactivo'}
+                  </div>
                 </div>
                 {!p.es_admin && (
-                  <button style={{...s.btnSm, ...s.btnDanger}} onClick={function() { eliminarParticipante(p) }}>Eliminar</button>
+                  <button
+                    style={{...s.toggleBtn, background: p.activo ? '#001a0f' : '#1a1200', borderColor: p.activo ? '#005a30' : '#2a2000', color: p.activo ? '#00C97A' : '#C9A84C'}}
+                    onClick={function() { toggleActivo(p) }}>
+                    {p.activo ? 'Desactivar' : 'Activar'}
+                  </button>
                 )}
               </div>
             )
           })}
+        </div>
+      )}
+
+      {tab === 'logo' && (
+        <div style={s.card}>
+          <div style={s.cardTitle}>LOGO / IMAGEN DE PORTADA</div>
+          <p style={s.hint}>Pega la URL de la imagen que quieres usar como logo. Se mostrará en el login, el header y como favicon.</p>
+          {logoUrl && (
+            <div style={{textAlign:'center', marginBottom: '1rem'}}>
+              <img src={logoUrl} alt="Logo actual" style={{width: 80, height: 'auto', filter: 'drop-shadow(0 4px 12px #C9A84C44)'}} />
+              <div style={{fontSize: 11, color: '#888880', marginTop: 6}}>Logo actual</div>
+            </div>
+          )}
+          <div style={s.form}>
+            <div>
+              <label style={{...s.hint, display:'block', marginBottom: 4}}>URL de la imagen</label>
+              <input style={s.input} type="text" placeholder="https://..." value={logoInput} onChange={function(e) { setLogoInput(e.target.value) }} />
+            </div>
+            <button style={s.btn} onClick={saveLogo}>GUARDAR LOGO</button>
+          </div>
+          <p style={{...s.hint, marginTop: '1rem'}}>Tip: sube la imagen a GitHub en la carpeta public/ y usa la URL de raw.githubusercontent.com</p>
         </div>
       )}
 
@@ -243,8 +296,8 @@ export default function Admin({ participante }) {
 const s = {
   page: { padding: '1rem 0' },
   noAdmin: { textAlign: 'center', padding: '3rem', color: '#444', fontSize: 15 },
-  tabs: { display: 'flex', borderBottom: '1px solid #1e1e1e', marginBottom: '1rem' },
-  tab: { flex: 1, background: 'none', border: 'none', borderBottom: '2px solid transparent', padding: '8px', fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: 'pointer', color: '#444', marginBottom: -1, fontFamily: "'Barlow Condensed', sans-serif" },
+  tabs: { display: 'flex', borderBottom: '1px solid #1e1e1e', marginBottom: '1rem', flexWrap: 'wrap' },
+  tab: { flex: 1, background: 'none', border: 'none', borderBottom: '2px solid transparent', padding: '8px 4px', fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: 'pointer', color: '#444', marginBottom: -1, fontFamily: "'Barlow Condensed', sans-serif", minWidth: 60 },
   tabActive: { color: '#C9A84C', borderBottomColor: '#C9A84C' },
   card: { background: '#111', border: '1px solid #1e1e1e', borderRadius: 12, padding: '14px', marginBottom: '1rem' },
   cardTitle: { fontSize: 11, letterSpacing: 3, fontWeight: 700, color: '#C9A84C', marginBottom: '1rem' },
@@ -256,12 +309,12 @@ const s = {
   rondaBtn: { padding: '4px 10px', borderRadius: 100, border: '1px solid #222', background: 'transparent', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#888880' },
   rondaActive: { background: '#C9A84C', color: '#0a0a0a', borderColor: '#C9A84C' },
   partidoCard: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#111', border: '1px solid #1e1e1e', borderRadius: 10, padding: '10px 14px', marginBottom: 8, gap: 8 },
-  partidoInfo: { flex: 1 },
+  partidoInfo: { flex: 1, minWidth: 0 },
   partidoNombre: { fontSize: 13, fontWeight: 600, color: '#F5F0E8' },
   partidoFecha: { fontSize: 11, color: '#888880', marginTop: 2 },
   resultadoBadge: { fontSize: 11, color: '#00C97A', marginTop: 4 },
-  partidoActions: { display: 'flex', gap: 6, flexWrap: 'wrap' },
-  btnSm: { padding: '6px 10px', border: '1px solid #222', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: '#161616', color: '#F5F0E8' },
+  partidoActions: { display: 'flex', gap: 4, flexWrap: 'wrap', flexShrink: 0 },
+  btnSm: { padding: '5px 8px', border: '1px solid #222', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#161616', color: '#F5F0E8' },
   btnGold: { background: '#C9A84C22', color: '#C9A84C', borderColor: '#C9A84C44' },
   btnWarning: { background: '#1a1200', color: '#C9A84C', borderColor: '#2a2000' },
   btnDanger: { background: '#1a0808', color: '#FF2D2D', borderColor: '#7a0f0f' },
@@ -269,7 +322,7 @@ const s = {
   partInfo: { flex: 1 },
   partNombre: { fontSize: 14, fontWeight: 600, color: '#F5F0E8', display: 'flex', alignItems: 'center', gap: 6 },
   adminBadge: { fontSize: 9, background: '#C9A84C', color: '#0a0a0a', padding: '2px 6px', borderRadius: 100, fontWeight: 900, letterSpacing: 1 },
+  toggleBtn: { padding: '6px 12px', border: '1px solid', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 },
   msgBox: { fontSize: 12, padding: '10px 14px', background: '#001a0f', color: '#00C97A', borderRadius: 8, marginBottom: '1rem', border: '1px solid #005a30' },
   hint: { fontSize: 12, color: '#888880', lineHeight: 1.6, marginBottom: 8 },
-  code: { fontFamily: 'monospace', fontSize: 11, background: '#161616', padding: '2px 6px', borderRadius: 4, color: '#C9A84C' },
 }
