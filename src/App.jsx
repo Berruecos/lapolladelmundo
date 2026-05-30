@@ -122,6 +122,7 @@ const s = {
   nav: { position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, background: '#0d0d0d', borderTop: '1px solid #1e1e1e', display: 'flex', zIndex: 10 },
   navBtn: { flex: 1, background: 'none', border: 'none', padding: '8px 4px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 },
   navBtnActive: { background: '#111' },
+  navIcon: { fontSize: 18 },
   navLabel: { fontSize: 9, color: '#444440', fontWeight: 700, letterSpacing: 1, fontFamily: "'Barlow Condensed', sans-serif" },
   navLabelActive: { color: '#C9A84C' },
 }
