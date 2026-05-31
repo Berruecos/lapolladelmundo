@@ -8,19 +8,21 @@ export default function Admin({ participante }) {
   const [tab, setTab] = useState('partidos')
   const [partidos, setPartidos] = useState([])
   const [participantes, setParticipantes] = useState([])
-  const [ronda, setRonda] = useState('R6')
+  const [ronda, setRonda] = useState('R1')
   const [form, setForm] = useState({ local: '', visita: '', fecha_hora: '', ronda: 'R1' })
   const [msg, setMsg] = useState('')
   const [apiKey, setApiKey] = useState(localStorage.getItem('api_football_key') || '')
+  const [syncingAll, setSyncingAll] = useState(false)
   const [logoUrl, setLogoUrl] = useState('')
   const [logoInput, setLogoInput] = useState('')
+  const [pronosticosActivos, setPronosticosActivos] = useState(true)
 
   function saveApiKey(key) {
     setApiKey(key)
     localStorage.setItem('api_football_key', key)
   }
 
-  useEffect(() => { fetchPartidos(); fetchParticipantes(); fetchLogo() }, [ronda])
+  useEffect(function() { fetchPartidos(); fetchParticipantes(); fetchConfig() }, [ronda])
 
   async function fetchPartidos() {
     const { data } = await supabase.from('partidos').select('*').eq('ronda', ronda).order('fecha_hora')
@@ -32,11 +34,11 @@ export default function Admin({ participante }) {
     setParticipantes(data || [])
   }
 
-  async function fetchLogo() {
-    const { data } = await supabase.from('configuracion').select('valor').eq('clave', 'logo_url').single()
-    if (data) { setLogoUrl(data.valor); setLogoInput(data.valor) }
+  async function fetchConfig() {
+    const { data: logo } = await supabase.from('configuracion').select('valor').eq('clave', 'logo_url').single()
+    if (logo) { setLogoUrl(logo.valor); setLogoInput(logo.valor) }
     const { data: pc } = await supabase.from('configuracion').select('valor').eq('clave', 'pronosticos_activos').single()
-    if (pc) { setPronosticosActivos(pc.valor === 'true') }
+    if (pc) setPronosticosActivos(pc.valor === 'true')
   }
 
   async function saveLogo() {
@@ -46,73 +48,115 @@ export default function Admin({ participante }) {
   }
 
   async function togglePronosticos() {
-    const nuevo = !pronosticosActivos
+    var nuevo = !pronosticosActivos
     await supabase.from('configuracion').upsert({ clave: 'pronosticos_activos', valor: nuevo ? 'true' : 'false', updated_at: new Date().toISOString() })
     setPronosticosActivos(nuevo)
-    showMsg(nuevo ? 'Pronósticos activados' : 'Pronósticos desactivados')
+    showMsg(nuevo ? 'Pronosticos activados' : 'Pronosticos desactivados')
+  }
+
+  async function cargarPartidosMundial() {
+    if (!apiKey) { showMsg('Primero agrega tu API key'); return }
+    if (!confirm('Cargar todos los partidos del Mundial 2026?')) return
+    setSyncingAll(true)
+    showMsg('Cargando partidos...')
+    try {
+      var res = await fetch('https://v3.football.api-sports.io/fixtures?league=1&season=2026', {
+        headers: { 'x-apisports-key': apiKey }
+      })
+      var data = await res.json()
+      var fixtures = data.response || []
+      if (fixtures.length === 0) { showMsg('No se encontraron partidos'); setSyncingAll(false); return }
+      var insertados = 0
+      var errores = 0
+      for (var i = 0; i < fixtures.length; i++) {
+        var f = fixtures[i]
+        var round = f.league.round || ''
+        var rondaVal = null
+        if (round.indexOf('Group') >= 0) rondaVal = 'R1'
+        else if (round.indexOf('Round of 32') >= 0 || round.indexOf('1/16') >= 0) rondaVal = 'R2'
+        else if (round.indexOf('Round of 16') >= 0 || round.indexOf('1/8') >= 0) rondaVal = 'R3'
+        else if (round.indexOf('Quarter') >= 0 || round.indexOf('1/4') >= 0) rondaVal = 'R4'
+        else if (round.indexOf('Semi') >= 0) rondaVal = 'R5'
+        else if (round.indexOf('Final') >= 0 && round.indexOf('3rd') < 0) rondaVal = 'R6'
+        if (!rondaVal) continue
+        var result = await supabase.from('partidos').upsert({
+          api_fixture_id: f.fixture.id,
+          ronda: rondaVal,
+          fase: FASES[rondaVal],
+          equipo_local: f.teams.home.name,
+          equipo_visita: f.teams.away.name,
+          fecha_hora: f.fixture.date,
+          estado: (f.fixture.status.short === 'FT') ? 'finalizado' : 'pendiente',
+          goles_local: f.goals.home,
+          goles_visita: f.goals.away,
+        }, { onConflict: 'api_fixture_id' })
+        if (result.error) errores++
+        else insertados++
+      }
+      showMsg(insertados + ' partidos cargados' + (errores > 0 ? ' (' + errores + ' errores)' : ''))
+      fetchPartidos()
+    } catch (err) {
+      showMsg('Error: ' + err.message)
+    }
+    setSyncingAll(false)
   }
 
   async function addPartido(e) {
     e.preventDefault()
-    const { error } = await supabase.from('partidos').insert({
+    var ins = await supabase.from('partidos').insert({
       ronda: form.ronda, fase: FASES[form.ronda],
       equipo_local: form.local.trim(), equipo_visita: form.visita.trim(),
       fecha_hora: form.fecha_hora, estado: 'pendiente',
     })
-    if (error) showMsg('Error: ' + error.message)
+    if (ins.error) showMsg('Error: ' + ins.error.message)
     else { showMsg('Partido agregado'); setForm({ ...form, local: '', visita: '', fecha_hora: '' }); fetchPartidos() }
   }
 
   async function registrarResultado(partido) {
-    const local = parseInt(prompt('Goles de ' + partido.equipo_local + ':'))
-    const visita = parseInt(prompt('Goles de ' + partido.equipo_visita + ':'))
+    var local = parseInt(prompt('Goles de ' + partido.equipo_local + ':'))
+    var visita = parseInt(prompt('Goles de ' + partido.equipo_visita + ':'))
     if (isNaN(local) || isNaN(visita)) return
-
-    const { data: jugs } = await supabase
-      .from('jugadores').select('nombre, numero')
-      .in('equipo', [partido.equipo_local, partido.equipo_visita])
-      .order('numero')
-
-    const jugList = (jugs || []).map(j => j.numero ? j.numero + ' - ' + j.nombre : j.nombre)
-    const opciones = ['0: autogol', ...jugList.map((n, i) => (i + 1) + ': ' + n)]
-    const seleccion = prompt('Primer anotador - escribe el numero:\n' + opciones.join('\n'))
+    var jugs = await supabase.from('jugadores').select('nombre, numero').in('equipo', [partido.equipo_local, partido.equipo_visita]).order('numero')
+    var jugList = (jugs.data || []).map(function(j) { return j.numero ? j.numero + ' - ' + j.nombre : j.nombre })
+    var opciones = ['0: autogol'].concat(jugList.map(function(n, i) { return (i + 1) + ': ' + n }))
+    var seleccion = prompt('Primer anotador - escribe el numero:\n' + opciones.join('\n'))
     if (seleccion === null) return
-    const idx = parseInt(seleccion)
-    let scorer = seleccion
+    var idx = parseInt(seleccion)
+    var scorer = seleccion
     if (!isNaN(idx)) {
       if (idx === 0) scorer = 'autogol'
-      else scorer = (jugs || [])[idx - 1]?.nombre || seleccion
+      else scorer = (jugs.data || [])[idx - 1] ? (jugs.data || [])[idx - 1].nombre : seleccion
     }
-
-    const { error } = await supabase.rpc('registrar_resultado', {
+    var rr = await supabase.rpc('registrar_resultado', {
       p_partido_id: partido.id,
       p_goles_local: local,
       p_goles_visita: visita,
       p_primer_anotador: scorer || null,
     })
-    if (error) showMsg('Error: ' + error.message)
+    if (rr.error) showMsg('Error: ' + rr.error.message)
     else { showMsg('Resultado guardado y puntos calculados'); fetchPartidos() }
   }
 
   async function eliminarPartido(partido) {
     if (!confirm('Eliminar ' + partido.equipo_local + ' vs ' + partido.equipo_visita + '?')) return
+    await supabase.from('puntos').delete().eq('partido_id', partido.id)
+    await supabase.from('pronosticos').delete().eq('partido_id', partido.id)
     await supabase.from('partidos').delete().eq('id', partido.id)
     showMsg('Partido eliminado')
     fetchPartidos()
   }
 
   async function ocultarPartido(partido) {
-    const nuevoEstado = partido.estado === 'oculto' ? 'pendiente' : 'oculto'
+    var nuevoEstado = partido.estado === 'oculto' ? 'pendiente' : 'oculto'
     await supabase.from('partidos').update({ estado: nuevoEstado }).eq('id', partido.id)
     showMsg(partido.estado === 'oculto' ? 'Partido visible' : 'Partido oculto')
     fetchPartidos()
   }
 
   async function toggleActivo(p) {
-    const nuevoEstado = !p.activo
+    var nuevoEstado = !p.activo
     if (nuevoEstado === true) {
-      // Activar: borrar puntos acumulados mientras estaba inactivo
-      if (confirm(p.nombre + ' pasará a ACTIVO y sus puntos acumulados se borrarán. ¿Continuar?')) {
+      if (confirm(p.nombre + ' pasara a ACTIVO y sus puntos acumulados se borraran. Continuar?')) {
         await supabase.from('puntos').delete().eq('participante_id', p.id)
         await supabase.from('participantes').update({ activo: true }).eq('id', p.id)
         showMsg(p.nombre + ' activado con 0 puntos')
@@ -125,83 +169,22 @@ export default function Admin({ participante }) {
     }
   }
 
-  const [syncingAll, setSyncingAll] = useState(false)
-  const [pronosticosActivos, setPronosticosActivos] = useState(true)
-
-  async function cargarPartidosMundial() {
-    if (!apiKey) { showMsg('Primero agrega tu API key en la pestaña API'); return }
-    if (!confirm('Esto cargará todos los partidos del Mundial 2026 desde la API. ¿Continuar?')) return
-    setSyncingAll(true)
-    showMsg('Cargando partidos del Mundial... esto puede tomar unos segundos')
-
-    try {
-      const res = await fetch('https://v3.football.api-sports.io/fixtures?league=1&season=2026', {
-        headers: { 'x-apisports-key': apiKey }
-      })
-      const data = await res.json()
-      const fixtures = data.response || []
-
-      if (fixtures.length === 0) { showMsg('No se encontraron partidos'); setSyncingAll(false); return }
-
-      // Mapear rondas del Mundial
-      const rondaMap = (round) => {
-        if (round.includes('Group')) return 'R1'
-        if (round.includes('Round of 32') || round.includes('1/16')) return 'R2'
-        if (round.includes('Round of 16') || round.includes('1/8')) return 'R3'
-        if (round.includes('Quarter') || round.includes('1/4')) return 'R4'
-        if (round.includes('Semi') || round.includes('1/2')) return 'R5'
-        if (round.includes('Final') && !round.includes('Semi') && !round.includes('3rd')) return 'R6'
-        return null
-      }
-
-      let insertados = 0
-      let errores = 0
-
-      for (const f of fixtures) {
-        const ronda = rondaMap(f.league.round)
-        if (!ronda) continue // Saltar 3er puesto
-
-        const { error } = await supabase.from('partidos').upsert({
-          api_fixture_id: f.fixture.id,
-          ronda,
-          fase: FASES[ronda],
-          equipo_local: f.teams.home.name,
-          equipo_visita: f.teams.away.name,
-          fecha_hora: f.fixture.date,
-          estado: f.fixture.status.short === 'FT' ? 'finalizado' : 'pendiente',
-          goles_local: f.goals.home,
-          goles_visita: f.goals.away,
-        }, { onConflict: 'api_fixture_id' })
-
-        if (error) errores++
-        else insertados++
-      }
-
-      showMsg('✓ ' + insertados + ' partidos cargados' + (errores > 0 ? ' (' + errores + ' errores)' : ''))
-      fetchPartidos()
-    } catch (err) {
-      showMsg('Error: ' + err.message)
-    }
-    setSyncingAll(false)
-  }
-
-
   function showMsg(m) { setMsg(m); setTimeout(function() { setMsg('') }, 4000) }
 
-  const fmtFecha = function(f) {
+  function fmtFecha(f) {
     return new Date(f).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
   }
 
-  if (!participante || !participante.es_admin) return (
-    <div style={s.noAdmin}>Solo para el organizador.</div>
-  )
+  if (!participante || !participante.es_admin) {
+    return React.createElement('div', { style: s.noAdmin }, 'Solo para el organizador.')
+  }
 
   return (
     <div style={s.page}>
       <div style={s.tabs}>
         {['partidos','participantes','config','api'].map(function(t) {
           return (
-            <button key={t} style={tab===t ? {...s.tab, ...s.tabActive} : s.tab} onClick={function() { setTab(t) }}>
+            <button key={t} style={tab===t ? Object.assign({}, s.tab, s.tabActive) : s.tab} onClick={function() { setTab(t) }}>
               {t.toUpperCase()}
             </button>
           )
@@ -214,24 +197,24 @@ export default function Admin({ participante }) {
         <div>
           <div style={s.card}>
             <div style={s.cardTitle}>CARGAR PARTIDOS DEL MUNDIAL</div>
-            <p style={s.hint}>Jala automáticamente todos los 104 partidos del Mundial 2026 desde la API. Si ya existen, los actualiza.</p>
-            <button style={{...s.btn, background: syncingAll ? '#333' : 'linear-gradient(135deg, #1E6FFF, #0d3b8a)'}}
+            <p style={s.hint}>Jala automaticamente todos los partidos del Mundial 2026 desde la API.</p>
+            <button style={Object.assign({}, s.btn, { background: syncingAll ? '#333' : 'linear-gradient(135deg, #1E6FFF, #0d3b8a)' })}
               onClick={cargarPartidosMundial} disabled={syncingAll}>
-              {syncingAll ? 'CARGANDO...' : '⚡ CARGAR TODOS LOS PARTIDOS DEL MUNDIAL'}
+              {syncingAll ? 'CARGANDO...' : 'CARGAR TODOS LOS PARTIDOS DEL MUNDIAL'}
             </button>
           </div>
 
           <div style={s.card}>
             <div style={s.cardTitle}>AGREGAR PARTIDO</div>
             <form onSubmit={addPartido} style={s.form}>
-              <select style={s.input} value={form.ronda} onChange={function(e) { setForm({...form, ronda: e.target.value}) }}>
+              <select style={s.input} value={form.ronda} onChange={function(e) { setForm(Object.assign({}, form, { ronda: e.target.value })) }}>
                 {RONDAS.map(function(r) { return <option key={r} value={r}>{r} - {FASES[r]}</option> })}
               </select>
               <div style={s.row2}>
-                <input style={s.input} placeholder="Equipo local" value={form.local} onChange={function(e) { setForm({...form, local: e.target.value}) }} required />
-                <input style={s.input} placeholder="Equipo visitante" value={form.visita} onChange={function(e) { setForm({...form, visita: e.target.value}) }} required />
+                <input style={s.input} placeholder="Equipo local" value={form.local} onChange={function(e) { setForm(Object.assign({}, form, { local: e.target.value })) }} required />
+                <input style={s.input} placeholder="Equipo visitante" value={form.visita} onChange={function(e) { setForm(Object.assign({}, form, { visita: e.target.value })) }} required />
               </div>
-              <input style={s.input} type="datetime-local" value={form.fecha_hora} onChange={function(e) { setForm({...form, fecha_hora: e.target.value}) }} required />
+              <input style={s.input} type="datetime-local" value={form.fecha_hora} onChange={function(e) { setForm(Object.assign({}, form, { fecha_hora: e.target.value })) }} required />
               <button style={s.btn} type="submit">+ AGREGAR</button>
             </form>
           </div>
@@ -239,7 +222,7 @@ export default function Admin({ participante }) {
           <div style={s.rondas}>
             {RONDAS.map(function(r) {
               return (
-                <button key={r} style={ronda===r ? {...s.rondaBtn, ...s.rondaActive} : s.rondaBtn} onClick={function() { setRonda(r) }}>
+                <button key={r} style={ronda===r ? Object.assign({}, s.rondaBtn, s.rondaActive) : s.rondaBtn} onClick={function() { setRonda(r) }}>
                   {FASES[r]}
                 </button>
               )
@@ -255,16 +238,15 @@ export default function Admin({ participante }) {
                   <div style={s.partidoNombre}>{p.equipo_local} vs {p.equipo_visita}</div>
                   <div style={s.partidoFecha}>{fmtFecha(p.fecha_hora)}</div>
                   {p.goles_local !== null && (
-                    <div style={s.resultadoBadge}>✓ {p.goles_local}-{p.goles_visita} · {p.primer_anotador || 'sin anotador'}</div>
+                    <div style={s.resultadoBadge}>{p.goles_local}-{p.goles_visita} - {p.primer_anotador || 'sin anotador'}</div>
                   )}
                 </div>
                 <div style={s.partidoActions}>
                   <button style={s.btnSm} onClick={function() { registrarResultado(p) }}>Manual</button>
-
-                  <button style={{...s.btnSm, ...s.btnWarning}} onClick={function() { ocultarPartido(p) }}>
+                  <button style={Object.assign({}, s.btnSm, s.btnWarning)} onClick={function() { ocultarPartido(p) }}>
                     {p.estado === 'oculto' ? 'Mostrar' : 'Ocultar'}
                   </button>
-                  <button style={{...s.btnSm, ...s.btnDanger}} onClick={function() { eliminarPartido(p) }}>Borrar</button>
+                  <button style={Object.assign({}, s.btnSm, s.btnDanger)} onClick={function() { eliminarPartido(p) }}>Borrar</button>
                 </div>
               </div>
             )
@@ -274,7 +256,7 @@ export default function Admin({ participante }) {
 
       {tab === 'participantes' && (
         <div>
-          <p style={s.hint}>Total: {participantes.length} · Activos: {participantes.filter(p=>p.activo).length}</p>
+          <p style={s.hint}>Total: {participantes.length} - Activos: {participantes.filter(function(p) { return p.activo }).length}</p>
           {participantes.map(function(p) {
             return (
               <div key={p.id} style={s.partRow}>
@@ -283,13 +265,17 @@ export default function Admin({ participante }) {
                     {p.nombre}
                     {p.es_admin && <span style={s.adminBadge}>ADMIN</span>}
                   </div>
-                  <div style={{fontSize: 11, color: p.activo ? '#00C97A' : '#666', marginTop: 2}}>
+                  <div style={{ fontSize: 11, color: p.activo ? '#00C97A' : '#666', marginTop: 2 }}>
                     {p.activo ? 'Activo' : 'Inactivo'}
                   </div>
                 </div>
                 {!p.es_admin && (
                   <button
-                    style={{...s.toggleBtn, background: p.activo ? '#001a0f' : '#1a1200', borderColor: p.activo ? '#005a30' : '#2a2000', color: p.activo ? '#00C97A' : '#C9A84C'}}
+                    style={Object.assign({}, s.toggleBtn, {
+                      background: p.activo ? '#001a0f' : '#1a1200',
+                      borderColor: p.activo ? '#005a30' : '#2a2000',
+                      color: p.activo ? '#00C97A' : '#C9A84C'
+                    })}
                     onClick={function() { toggleActivo(p) }}>
                     {p.activo ? 'Desactivar' : 'Activar'}
                   </button>
@@ -300,52 +286,39 @@ export default function Admin({ participante }) {
         </div>
       )}
 
-      
-          <div style={s.form}>
-            <div>
-              <label style={{...s.hint, display:'block', marginBottom: 4}}>URL de la imagen</label>
-              <input style={s.input} type="text" placeholder="https://..." value={logoInput} onChange={function(e) { setLogoInput(e.target.value) }} />
-            </div>
-            <button style={s.btn} onClick={saveLogo}>GUARDAR LOGO</button>
-          </div>
-          <p style={{...s.hint, marginTop: '1rem'}}>Tip: sube la imagen a GitHub en la carpeta public/ y usa la URL de raw.githubusercontent.com</p>
-        </div>
-      )}
-
       {tab === 'config' && (
         <div>
           <div style={s.card}>
-            <div style={s.cardTitle}>LOGO / IMAGEN DE PORTADA</div>
-            <p style={s.hint}>Pega la URL de la imagen que quieres usar como logo.</p>
+            <div style={s.cardTitle}>LOGO</div>
+            <p style={s.hint}>URL de la imagen del logo.</p>
             {logoUrl && (
-              <div style={{textAlign:'center', marginBottom: '1rem'}}>
-                <img src={logoUrl} alt="Logo actual" style={{width: 80, height: 'auto', filter: 'drop-shadow(0 4px 12px #C9A84C44)'}} />
-                <div style={{fontSize: 11, color: '#888880', marginTop: 6}}>Logo actual</div>
+              <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                <img src={logoUrl} alt="Logo" style={{ width: 80, height: 'auto' }} />
               </div>
             )}
-            <div style={s.form}>
-              <div>
-                <label style={{...s.hint, display:'block', marginBottom: 4}}>URL de la imagen</label>
-                <input style={s.input} type="text" placeholder="https://..." value={logoInput} onChange={function(e) { setLogoInput(e.target.value) }} />
-              </div>
-              <button style={s.btn} onClick={saveLogo}>GUARDAR LOGO</button>
-            </div>
+            <input style={s.input} type="text" placeholder="https://..." value={logoInput} onChange={function(e) { setLogoInput(e.target.value) }} />
+            <button style={Object.assign({}, s.btn, { marginTop: 8 })} onClick={saveLogo}>GUARDAR LOGO</button>
           </div>
 
           <div style={s.card}>
-            <div style={s.cardTitle}>PRONÓSTICOS</div>
-            <p style={s.hint}>Activa o desactiva la posibilidad de que los participantes envíen pronósticos.</p>
-            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 0'}}>
+            <div style={s.cardTitle}>PRONOSTICOS</div>
+            <p style={s.hint}>Activa o desactiva el envio de pronosticos para todos los participantes.</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
               <div>
-                <div style={{fontSize: 14, fontWeight: 600, color: pronosticosActivos ? '#00C97A' : '#FF2D2D'}}>
-                  {pronosticosActivos ? 'PRONÓSTICOS ACTIVADOS' : 'PRONÓSTICOS DESACTIVADOS'}
+                <div style={{ fontSize: 14, fontWeight: 600, color: pronosticosActivos ? '#00C97A' : '#FF2D2D' }}>
+                  {pronosticosActivos ? 'ACTIVADOS' : 'DESACTIVADOS'}
                 </div>
-                <div style={{fontSize: 12, color: '#888880', marginTop: 4}}>
-                  {pronosticosActivos ? 'Los participantes pueden enviar sus picks' : 'Nadie puede enviar pronósticos'}
+                <div style={{ fontSize: 12, color: '#888880', marginTop: 4 }}>
+                  {pronosticosActivos ? 'Los participantes pueden enviar sus picks' : 'Nadie puede enviar pronosticos'}
                 </div>
               </div>
               <button
-                style={{...s.toggleBtn, background: pronosticosActivos ? '#001a0f' : '#1a0808', borderColor: pronosticosActivos ? '#005a30' : '#7a0f0f', color: pronosticosActivos ? '#00C97A' : '#FF2D2D', minWidth: 100}}
+                style={Object.assign({}, s.toggleBtn, {
+                  background: pronosticosActivos ? '#001a0f' : '#1a0808',
+                  borderColor: pronosticosActivos ? '#005a30' : '#7a0f0f',
+                  color: pronosticosActivos ? '#00C97A' : '#FF2D2D',
+                  minWidth: 100
+                })}
                 onClick={togglePronosticos}>
                 {pronosticosActivos ? 'DESACTIVAR' : 'ACTIVAR'}
               </button>
@@ -357,9 +330,8 @@ export default function Admin({ participante }) {
       {tab === 'api' && (
         <div style={s.card}>
           <div style={s.cardTitle}>API-FOOTBALL</div>
-          <p style={s.hint}>Registrate en dashboard.api-football.com, copia tu API key y pegala aqui.</p>
+          <p style={s.hint}>Pega tu API key aqui.</p>
           <input style={s.input} type="text" placeholder="Tu API key" value={apiKey} onChange={function(e) { saveApiKey(e.target.value) }} />
-          <p style={{...s.hint, marginTop: 12}}>Cada partido necesita su api_fixture_id para sincronizar automaticamente.</p>
         </div>
       )}
     </div>
@@ -388,7 +360,6 @@ const s = {
   resultadoBadge: { fontSize: 11, color: '#00C97A', marginTop: 4 },
   partidoActions: { display: 'flex', gap: 4, flexWrap: 'wrap', flexShrink: 0 },
   btnSm: { padding: '5px 8px', border: '1px solid #222', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: '#161616', color: '#F5F0E8' },
-  btnGold: { background: '#C9A84C22', color: '#C9A84C', borderColor: '#C9A84C44' },
   btnWarning: { background: '#1a1200', color: '#C9A84C', borderColor: '#2a2000' },
   btnDanger: { background: '#1a0808', color: '#FF2D2D', borderColor: '#7a0f0f' },
   partRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#111', border: '1px solid #1e1e1e', borderRadius: 10, padding: '10px 14px', marginBottom: 8 },
