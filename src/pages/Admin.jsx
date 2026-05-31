@@ -35,12 +35,21 @@ export default function Admin({ participante }) {
   async function fetchLogo() {
     const { data } = await supabase.from('configuracion').select('valor').eq('clave', 'logo_url').single()
     if (data) { setLogoUrl(data.valor); setLogoInput(data.valor) }
+    const { data: pc } = await supabase.from('configuracion').select('valor').eq('clave', 'pronosticos_activos').single()
+    if (pc) { setPronosticosActivos(pc.valor === 'true') }
   }
 
   async function saveLogo() {
     await supabase.from('configuracion').upsert({ clave: 'logo_url', valor: logoInput, updated_at: new Date().toISOString() })
     setLogoUrl(logoInput)
     showMsg('Logo actualizado')
+  }
+
+  async function togglePronosticos() {
+    const nuevo = !pronosticosActivos
+    await supabase.from('configuracion').upsert({ clave: 'pronosticos_activos', valor: nuevo ? 'true' : 'false', updated_at: new Date().toISOString() })
+    setPronosticosActivos(nuevo)
+    showMsg(nuevo ? 'Pronósticos activados' : 'Pronósticos desactivados')
   }
 
   async function addPartido(e) {
@@ -117,6 +126,7 @@ export default function Admin({ participante }) {
   }
 
   const [syncingAll, setSyncingAll] = useState(false)
+  const [pronosticosActivos, setPronosticosActivos] = useState(true)
 
   async function cargarPartidosMundial() {
     if (!apiKey) { showMsg('Primero agrega tu API key en la pestaña API'); return }
@@ -189,7 +199,7 @@ export default function Admin({ participante }) {
   return (
     <div style={s.page}>
       <div style={s.tabs}>
-        {['partidos','participantes','logo','api'].map(function(t) {
+        {['partidos','participantes','config','api'].map(function(t) {
           return (
             <button key={t} style={tab===t ? {...s.tab, ...s.tabActive} : s.tab} onClick={function() { setTab(t) }}>
               {t.toUpperCase()}
@@ -290,16 +300,7 @@ export default function Admin({ participante }) {
         </div>
       )}
 
-      {tab === 'logo' && (
-        <div style={s.card}>
-          <div style={s.cardTitle}>LOGO / IMAGEN DE PORTADA</div>
-          <p style={s.hint}>Pega la URL de la imagen que quieres usar como logo. Se mostrará en el login, el header y como favicon.</p>
-          {logoUrl && (
-            <div style={{textAlign:'center', marginBottom: '1rem'}}>
-              <img src={logoUrl} alt="Logo actual" style={{width: 80, height: 'auto', filter: 'drop-shadow(0 4px 12px #C9A84C44)'}} />
-              <div style={{fontSize: 11, color: '#888880', marginTop: 6}}>Logo actual</div>
-            </div>
-          )}
+      
           <div style={s.form}>
             <div>
               <label style={{...s.hint, display:'block', marginBottom: 4}}>URL de la imagen</label>
@@ -308,6 +309,48 @@ export default function Admin({ participante }) {
             <button style={s.btn} onClick={saveLogo}>GUARDAR LOGO</button>
           </div>
           <p style={{...s.hint, marginTop: '1rem'}}>Tip: sube la imagen a GitHub en la carpeta public/ y usa la URL de raw.githubusercontent.com</p>
+        </div>
+      )}
+
+      {tab === 'config' && (
+        <div>
+          <div style={s.card}>
+            <div style={s.cardTitle}>LOGO / IMAGEN DE PORTADA</div>
+            <p style={s.hint}>Pega la URL de la imagen que quieres usar como logo.</p>
+            {logoUrl && (
+              <div style={{textAlign:'center', marginBottom: '1rem'}}>
+                <img src={logoUrl} alt="Logo actual" style={{width: 80, height: 'auto', filter: 'drop-shadow(0 4px 12px #C9A84C44)'}} />
+                <div style={{fontSize: 11, color: '#888880', marginTop: 6}}>Logo actual</div>
+              </div>
+            )}
+            <div style={s.form}>
+              <div>
+                <label style={{...s.hint, display:'block', marginBottom: 4}}>URL de la imagen</label>
+                <input style={s.input} type="text" placeholder="https://..." value={logoInput} onChange={function(e) { setLogoInput(e.target.value) }} />
+              </div>
+              <button style={s.btn} onClick={saveLogo}>GUARDAR LOGO</button>
+            </div>
+          </div>
+
+          <div style={s.card}>
+            <div style={s.cardTitle}>PRONÓSTICOS</div>
+            <p style={s.hint}>Activa o desactiva la posibilidad de que los participantes envíen pronósticos.</p>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 0'}}>
+              <div>
+                <div style={{fontSize: 14, fontWeight: 600, color: pronosticosActivos ? '#00C97A' : '#FF2D2D'}}>
+                  {pronosticosActivos ? 'PRONÓSTICOS ACTIVADOS' : 'PRONÓSTICOS DESACTIVADOS'}
+                </div>
+                <div style={{fontSize: 12, color: '#888880', marginTop: 4}}>
+                  {pronosticosActivos ? 'Los participantes pueden enviar sus picks' : 'Nadie puede enviar pronósticos'}
+                </div>
+              </div>
+              <button
+                style={{...s.toggleBtn, background: pronosticosActivos ? '#001a0f' : '#1a0808', borderColor: pronosticosActivos ? '#005a30' : '#7a0f0f', color: pronosticosActivos ? '#00C97A' : '#FF2D2D', minWidth: 100}}
+                onClick={togglePronosticos}>
+                {pronosticosActivos ? 'DESACTIVAR' : 'ACTIVAR'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
