@@ -177,7 +177,7 @@ export default function Admin({ participante }) {
         else insertados++
       }
 
-      showMsg(`✓ ${insertados} partidos cargados correctamente${errores > 0 ? ` (${errores} errores)` : ''}`)
+      showMsg('✓ ' + insertados + ' partidos cargados' + (errores > 0 ? ' (' + errores + ' errores)' : ''))
       fetchPartidos()
     } catch (err) {
       showMsg('Error: ' + err.message)
