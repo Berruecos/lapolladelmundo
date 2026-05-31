@@ -190,20 +190,12 @@ export default function Pronosticos({ participante }) {
               </div>
 
               {!bloqueado && (
-                !pronosticosActivos ? (
-                  <button style={{...s.enviarBtn, background:'#1a0808', color:'#FF2D2D', cursor:'not-allowed', opacity: 0.7}} disabled>
-                    PRONÓSTICOS DESACTIVADOS TEMPORALMENTE
-                  </button>
-                ) : todosJug.length === 0 ? (
-                  <button style={{...s.enviarBtn, background:'#222', color:'#888880', cursor:'not-allowed', opacity: 0.7}} disabled>
-                    NÓMINAS AÚN NO DISPONIBLES
-                  </button>
-                ) : (
-                  <button style={{...s.enviarBtn, opacity: saving === p.id ? 0.7 : 1}}
-                    onClick={() => enviarProno(p)} disabled={saving === p.id}>
-                    {saving === p.id ? 'ENVIANDO...' : 'ENVIAR PRONÓSTICO'}
-                  </button>
-                )
+                <button
+                  style={{...s.enviarBtn, opacity: (!pronosticosActivos || todosJug.length === 0 || saving === p.id) ? 0.4 : 1, cursor: (!pronosticosActivos || todosJug.length === 0) ? 'not-allowed' : 'pointer'}}
+                  onClick={() => pronosticosActivos && todosJug.length > 0 && enviarProno(p)}
+                  disabled={!pronosticosActivos || todosJug.length === 0 || saving === p.id}>
+                  {saving === p.id ? 'ENVIANDO...' : 'ENVIAR PRONÓSTICO'}
+                </button>
               )}
             </div>
           )
