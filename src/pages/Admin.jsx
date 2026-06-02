@@ -142,6 +142,9 @@ export default function Admin({ participante }) {
 
     showMsg(insertados + ' jugadores cargados' + (errores > 0 ? ' (' + errores + ' errores)' : ''))
     setSyncingAll(false)
+    }
+
+  async function addPartido(e) {
   }
     e.preventDefault()
     var ins = await supabase.from('partidos').insert({
