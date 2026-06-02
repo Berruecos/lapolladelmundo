@@ -110,7 +110,7 @@ export default function Admin({ participante }) {
     var equipos = [1,2,3,5,6,7,8,9,10,11,12,13,15,16,17,20,22,23,25,26,27,28,31,32,770,775,777,1090,1108,1113,1118,1501,1504,1508,1531,1532,1533,1548,1567,1568,1569,2380,2382,2384,2386,4673,5529,5530]
 
     var insertados = 0
-    var errores = 0
+    var equiposCargados = 0
 
     for (var i = 0; i < equipos.length; i++) {
       var teamId = equipos[i]
@@ -119,32 +119,41 @@ export default function Admin({ participante }) {
           headers: { 'x-apisports-key': apiKey }
         })
         var data = await res.json()
-        var squad = data.response && data.response[0] ? data.response[0].players : []
-        var teamName = data.response && data.response[0] ? data.response[0].team.name : ''
+        if (!data.response || !data.response[0]) continue
+        var teamName = data.response[0].team.name
+        var squad = data.response[0].players || []
 
-        for (var j = 0; j < squad.length; j++) {
-          var p = squad[j]
-          var result = await supabase.from('jugadores').upsert({
+        // Borrar jugadores anteriores del equipo
+        await supabase.from('jugadores').delete().eq('equipo', teamName)
+
+        // Insertar nuevos
+        var jugadoresEquipo = squad.map(function(p) {
+          return {
             equipo: teamName,
             nombre: p.name,
             numero: p.number || null,
             posicion: p.position || null,
-          }, { onConflict: 'equipo,nombre' })
-          if (result.error) errores++
-          else insertados++
+          }
+        })
+
+        if (jugadoresEquipo.length > 0) {
+          var result = await supabase.from('jugadores').insert(jugadoresEquipo)
+          if (!result.error) {
+            insertados += jugadoresEquipo.length
+            equiposCargados++
+          }
         }
-        showMsg('Cargando... equipo ' + (i+1) + ' de ' + equipos.length)
+
+        showMsg('Cargando... ' + (i+1) + ' de ' + equipos.length + ' equipos')
       } catch (err) {
-        errores++
+        // continuar con el siguiente equipo
       }
-      await new Promise(function(r) { setTimeout(r, 200) })
+      await new Promise(function(r) { setTimeout(r, 300) })
     }
 
-    showMsg(insertados + ' jugadores cargados' + (errores > 0 ? ' (' + errores + ' errores)' : ''))
+    showMsg(insertados + ' jugadores cargados en ' + equiposCargados + ' equipos')
     setSyncingAll(false)
-    }
-
-  async function addPartido(e) {
+  }
     e.preventDefault()
     var ins = await supabase.from('partidos').insert({
       ronda: form.ronda, fase: FASES[form.ronda],
