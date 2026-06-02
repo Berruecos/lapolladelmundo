@@ -154,15 +154,6 @@ export default function Admin({ participante }) {
     showMsg(insertados + ' jugadores cargados en ' + equiposCargados + ' equipos')
     setSyncingAll(false)
   }
-    e.preventDefault()
-    var ins = await supabase.from('partidos').insert({
-      ronda: form.ronda, fase: FASES[form.ronda],
-      equipo_local: form.local.trim(), equipo_visita: form.visita.trim(),
-      fecha_hora: form.fecha_hora, estado: 'pendiente',
-    })
-    if (ins.error) showMsg('Error: ' + ins.error.message)
-    else { showMsg('Partido agregado'); setForm({ ...form, local: '', visita: '', fecha_hora: '' }); fetchPartidos() }
-  }
 
   async function addPartido(e) {
     e.preventDefault()
