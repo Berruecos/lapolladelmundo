@@ -153,6 +153,17 @@ export default function Admin({ participante }) {
     else { showMsg('Partido agregado'); setForm({ ...form, local: '', visita: '', fecha_hora: '' }); fetchPartidos() }
   }
 
+  async function addPartido(e) {
+    e.preventDefault()
+    var ins = await supabase.from('partidos').insert({
+      ronda: form.ronda, fase: FASES[form.ronda],
+      equipo_local: form.local.trim(), equipo_visita: form.visita.trim(),
+      fecha_hora: form.fecha_hora, estado: 'pendiente',
+    })
+    if (ins.error) showMsg('Error: ' + ins.error.message)
+    else { showMsg('Partido agregado'); setForm(Object.assign({}, form, { local: '', visita: '', fecha_hora: '' })); fetchPartidos() }
+  }
+
   async function registrarResultado(partido) {
     var local = parseInt(prompt('Goles de ' + partido.equipo_local + ':'))
     var visita = parseInt(prompt('Goles de ' + partido.equipo_visita + ':'))
