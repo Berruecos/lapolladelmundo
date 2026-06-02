@@ -145,7 +145,6 @@ export default function Admin({ participante }) {
     }
 
   async function addPartido(e) {
-  }
     e.preventDefault()
     var ins = await supabase.from('partidos').insert({
       ronda: form.ronda, fase: FASES[form.ronda],
