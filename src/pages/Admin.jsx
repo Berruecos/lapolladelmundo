@@ -101,7 +101,48 @@ export default function Admin({ participante }) {
     setSyncingAll(false)
   }
 
-  async function addPartido(e) {
+  async function cargarNominas() {
+    if (!apiKey) { showMsg('Primero agrega tu API key'); return }
+    if (!confirm('Cargar nominas de los 48 equipos del Mundial? Esto puede tardar 1-2 minutos.')) return
+    setSyncingAll(true)
+    showMsg('Cargando nominas... no cierres la app')
+
+    var equipos = [1,2,3,5,6,7,8,9,10,11,12,13,15,16,17,20,22,23,25,26,27,28,31,32,770,775,777,1090,1108,1113,1118,1501,1504,1508,1531,1532,1533,1548,1567,1568,1569,2380,2382,2384,2386,4673,5529,5530]
+
+    var insertados = 0
+    var errores = 0
+
+    for (var i = 0; i < equipos.length; i++) {
+      var teamId = equipos[i]
+      try {
+        var res = await fetch('https://v3.football.api-sports.io/players/squads?team=' + teamId, {
+          headers: { 'x-apisports-key': apiKey }
+        })
+        var data = await res.json()
+        var squad = data.response && data.response[0] ? data.response[0].players : []
+        var teamName = data.response && data.response[0] ? data.response[0].team.name : ''
+
+        for (var j = 0; j < squad.length; j++) {
+          var p = squad[j]
+          var result = await supabase.from('jugadores').upsert({
+            equipo: teamName,
+            nombre: p.name,
+            numero: p.number || null,
+            posicion: p.position || null,
+          }, { onConflict: 'equipo,nombre' })
+          if (result.error) errores++
+          else insertados++
+        }
+        showMsg('Cargando... equipo ' + (i+1) + ' de ' + equipos.length)
+      } catch (err) {
+        errores++
+      }
+      await new Promise(function(r) { setTimeout(r, 200) })
+    }
+
+    showMsg(insertados + ' jugadores cargados' + (errores > 0 ? ' (' + errores + ' errores)' : ''))
+    setSyncingAll(false)
+  }
     e.preventDefault()
     var ins = await supabase.from('partidos').insert({
       ronda: form.ronda, fase: FASES[form.ronda],
@@ -196,7 +237,15 @@ export default function Admin({ participante }) {
       {tab === 'partidos' && (
         <div>
           <div style={s.card}>
-            <div style={s.cardTitle}>CARGAR PARTIDOS DEL MUNDIAL</div>
+            <div style={s.cardTitle}>CARGAR NOMINAS DEL MUNDIAL</div>
+            <p style={s.hint}>Jala automaticamente las nominas oficiales de los 48 equipos. Tarda 1-2 minutos.</p>
+            <button style={Object.assign({}, s.btn, { background: syncingAll ? '#333' : 'linear-gradient(135deg, #00C97A, #005a30)' })}
+              onClick={cargarNominas} disabled={syncingAll}>
+              {syncingAll ? 'CARGANDO NOMINAS...' : 'CARGAR NOMINAS DE LOS 48 EQUIPOS'}
+            </button>
+          </div>
+
+          <div style={s.card}>
             <p style={s.hint}>Jala automaticamente todos los partidos del Mundial 2026 desde la API.</p>
             <button style={Object.assign({}, s.btn, { background: syncingAll ? '#333' : 'linear-gradient(135deg, #1E6FFF, #0d3b8a)' })}
               onClick={cargarPartidosMundial} disabled={syncingAll}>
