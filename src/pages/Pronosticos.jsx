@@ -83,10 +83,19 @@ export default function Pronosticos({ participante }) {
   }
 
   function isDeadlinePassed(fechaHora) {
-    const deadline = new Date(fechaHora)
+    // Convertir la fecha del partido a hora Colombia (UTC-5)
+    const partidoUTC = new Date(fechaHora)
+    const partidoColombia = new Date(partidoUTC.getTime() - (5 * 60 * 60 * 1000))
+    
+    // Deadline: 23:59 del día anterior en hora Colombia
+    const deadline = new Date(partidoColombia)
     deadline.setDate(deadline.getDate() - 1)
     deadline.setHours(23, 59, 0, 0)
-    return new Date() > deadline
+    
+    // Hora actual en Colombia
+    const ahoraColombia = new Date(new Date().getTime() - (5 * 60 * 60 * 1000))
+    
+    return ahoraColombia > deadline
   }
 
   async function enviarProno(partido) {
