@@ -82,22 +82,16 @@ export default function Pronosticos({ participante }) {
     }))
   }
 
-  function isDeadlinePassed(fechaHora) {
-    // Convertir la fecha del partido a hora Colombia (UTC-5)
+ function isDeadlinePassed(fechaHora) {
     const partidoUTC = new Date(fechaHora)
-    const partidoColombia = new Date(partidoUTC.getTime() - (5 * 60 * 60 * 1000))
-    
-    // Deadline: 23:59 del día anterior en hora Colombia
-    const deadline = new Date(partidoColombia)
-    deadline.setDate(deadline.getDate() - 1)
-    deadline.setHours(23, 59, 0, 0)
-    
-    // Hora actual en Colombia
-    const ahoraColombia = new Date(new Date().getTime() - (5 * 60 * 60 * 1000))
-    
-    return ahoraColombia > deadline
+    const offsetColombia = 5 * 60 * 60 * 1000
+    const partidoColombia = new Date(partidoUTC.getTime() - offsetColombia)
+    const deadlineColombia = new Date(partidoColombia)
+    deadlineColombia.setDate(deadlineColombia.getDate() - 1)
+    deadlineColombia.setHours(23, 59, 59, 0)
+    const ahoraColombia = new Date(Date.now() - offsetColombia)
+    return ahoraColombia > deadlineColombia
   }
-
   async function enviarProno(partido) {
     if (enviados[partido.id]) return
     setSaving(partido.id)
