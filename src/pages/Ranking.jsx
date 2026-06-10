@@ -83,10 +83,10 @@ function ProximosPartidos() {
     const d = new Date(f)
     const hoy = new Date()
     const man = new Date(); man.setDate(hoy.getDate()+1)
-    const hora = d.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'})
+    const hora = d.toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit'})
     if (d.toDateString() === hoy.toDateString()) return 'Hoy · ' + hora
     if (d.toDateString() === man.toDateString()) return 'Mañana · ' + hora
-    return d.toLocaleDateString('es-CO', {weekday:'short', day:'numeric', month:'short'}) + ' · ' + hora
+    return d.toLocaleDateString('es', {weekday:'short', day:'numeric', month:'short'}) + ' · ' + hora
   }
 
   const rondaLabel = r => ({R1:'Grupos',R2:'16avos',R3:'Octavos',R4:'Cuartos',R5:'Semis',R6:'Final'})[r] || r
