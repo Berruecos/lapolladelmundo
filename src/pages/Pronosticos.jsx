@@ -45,8 +45,11 @@ export default function Pronosticos({ participante }) {
       .eq('participante_id', participante.id)
       .in('partido_id', ids.length ? ids : [0])
 
-    const { data: jugs } = await supabase
-     .from('jugadores').select('nombre, numero, equipo').limit(2000)
+    const { data: jugs1 } = await supabase
+      .from('jugadores').select('nombre, numero, equipo').range(0, 999)
+    const { data: jugs2 } = await supabase
+      .from('jugadores').select('nombre, numero, equipo').range(1000, 1999)
+    const jugs = [...(jugs1 || []), ...(jugs2 || [])]
 
     const pronosMap = {}
     const enviadosMap = {}
