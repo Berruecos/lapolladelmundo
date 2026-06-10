@@ -226,7 +226,7 @@ export default function Admin({ participante }) {
   function showMsg(m) { setMsg(m); setTimeout(function() { setMsg('') }, 4000) }
 
   function fmtFecha(f) {
-    return new Date(f).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    return new Date(f).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
   }
 
   if (!participante || !participante.es_admin) {
