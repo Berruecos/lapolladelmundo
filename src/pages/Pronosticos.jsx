@@ -46,7 +46,7 @@ export default function Pronosticos({ participante }) {
       .in('partido_id', ids.length ? ids : [0])
 
     const { data: jugs } = await supabase
-      .from('jugadores').select('nombre, numero, equipo')
+     .from('jugadores').select('nombre, numero, equipo').limit(2000)
 
     const pronosMap = {}
     const enviadosMap = {}
