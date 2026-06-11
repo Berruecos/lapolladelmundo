@@ -100,6 +100,7 @@ function ProximosPartidos() {
           <div style={pp.liveHeader}>
             <span style={pp.liveDot}></span>
             <span style={pp.liveLabel}>EN VIVO · {rondaLabel(p.ronda)}</span>
+            {p.minuto && <span style={pp.liveMin}>{p.minuto}'</span>}
           </div>
           <div style={pp.matchRow}>
             <span style={pp.team}>{p.equipo_local}</span>
