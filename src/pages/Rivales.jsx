@@ -31,10 +31,14 @@ export default function Rivales() {
   }
 
   function isDeadlinePassed(fechaHora) {
-    const deadline = new Date(fechaHora)
-    deadline.setDate(deadline.getDate() - 1)
-    deadline.setHours(23, 59, 0, 0)
-    return new Date() > deadline
+    const partidoUTC = new Date(fechaHora)
+    const offsetColombia = 5 * 60 * 60 * 1000
+    const partidoColombia = new Date(partidoUTC.getTime() - offsetColombia)
+    const deadlineColombia = new Date(partidoColombia)
+    deadlineColombia.setDate(deadlineColombia.getDate() - 1)
+    deadlineColombia.setHours(23, 59, 59, 0)
+    const ahoraColombia = new Date(Date.now() - offsetColombia)
+    return ahoraColombia > deadlineColombia
   }
 
   async function fetchPicks(partido) {
@@ -63,7 +67,11 @@ export default function Rivales() {
     return { total, marcadorOk, resultadoOk, anotadorOk }
   }
 
-  const fmtFecha = f => new Date(f).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' })
+  function abrev(nombre) {
+    return nombre.slice(0, 3).toUpperCase()
+  }
+
+  const fmtFecha = f => new Date(f).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' })
   const rondaLabel = r => ({ R1:'Grupos', R2:'16avos', R3:'Octavos', R4:'Cuartos', R5:'Semis', R6:'Final' })[r] || r
 
   return (
@@ -107,7 +115,7 @@ export default function Rivales() {
                 {selectedPartido.goles_local !== null && (
                   <div style={s.picksResultado}>
                     Resultado: {selectedPartido.goles_local}–{selectedPartido.goles_visita}
-                    {selectedPartido.primer_anotador && ` · ⚽ ${selectedPartido.primer_anotador}`}
+                    {selectedPartido.primer_anotador && ` · ${selectedPartido.primer_anotador}`}
                   </div>
                 )}
               </div>
@@ -117,7 +125,7 @@ export default function Rivales() {
                 <div style={s.table}>
                   <div style={s.tableHeader}>
                     <span style={s.thName}>PARTICIPANTE</span>
-                    <span style={s.thScore}>MARCADOR</span>
+                    <span style={s.thScore}>{abrev(selectedPartido.equipo_local)} – {abrev(selectedPartido.equipo_visita)}</span>
                     <span style={s.thScorer}>ANOTADOR</span>
                     <span style={s.thPts}>PTS</span>
                   </div>
