@@ -113,7 +113,6 @@ function ProximosPartidos() {
             </div>
           )}
         </div>
-          </div>
       ))}
       {proximos.length > 0 && (
         <>
