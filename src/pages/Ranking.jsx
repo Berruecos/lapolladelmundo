@@ -105,11 +105,14 @@ function ProximosPartidos() {
           <div style={pp.matchRow}>
             <span style={pp.team}>{p.equipo_local}</span>
             <div style={pp.liveScore}>{p.goles_local != null ? p.goles_local : '–'} : {p.goles_visita != null ? p.goles_visita : '–'}</div>
-            {p.primer_anotador && (
-              <div style={{width:'100%', textAlign:'center', fontSize:11, color:'#888880', marginTop:6}}>
-                ⚽ {p.primer_anotador}
-              </div>
-            )}
+            <span style={{...pp.team, textAlign:'right'}}>{p.equipo_visita}</span>
+          </div>
+          {p.primer_anotador && (
+            <div style={{textAlign:'center', fontSize:11, color:'#888880', marginTop:6}}>
+              ⚽ {p.primer_anotador}
+            </div>
+          )}
+        </div>
           </div>
         </div>
       ))}
