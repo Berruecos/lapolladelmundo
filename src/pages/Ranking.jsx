@@ -136,7 +136,7 @@ const pp = {
   liveCard: { background: 'linear-gradient(135deg, #1a0808, #0a0a0a)', border: '1px solid #7a0f0f', borderRadius: 12, padding: '12px 14px', marginBottom: 8 },
   liveHeader: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
   liveDot: { width: 8, height: 8, borderRadius: '50%', background: '#FF2D2D', display: 'inline-block' },
-  liveMin: { fontSize: 11, fontWeight: 700, color: '#FF2D2D', marginLeft: 'auto' },
+  liveMin: { fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#FF2D2D', marginLeft: 8, fontFamily: "'Barlow Condensed', sans-serif" },
   liveScore: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 900, color: '#FF2D2D', minWidth: 70, textAlign: 'center' },
   card: { background: '#111', border: '1px solid #1e1e1e', borderRadius: 12, padding: '10px 14px', marginBottom: 8 },
   cardTop: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 },
