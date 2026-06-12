@@ -270,6 +270,7 @@ export default function Ranking({ participante }) {
         id: p.id,
         nombre: p.nombre,
         activo: p.activo,
+        foto_url: p.foto_url,
         total: puntosFiltrados.reduce((s, pu) => s + (pu.total || 0), 0),
         pts_marcador: puntosFiltrados.reduce((s, pu) => s + (pu.pts_marcador || 0), 0),
         pts_anotador: puntosFiltrados.reduce((s, pu) => s + (pu.pts_anotador || 0), 0),
