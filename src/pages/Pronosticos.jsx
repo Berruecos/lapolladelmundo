@@ -84,15 +84,11 @@ export default function Pronosticos({ participante }) {
     }))
   }
 
- function isDeadlinePassed(fechaHora) {
+ ffunction isDeadlinePassed(fechaHora) {
     const partidoUTC = new Date(fechaHora)
-    const offsetColombia = 5 * 60 * 60 * 1000
-    const partidoColombia = new Date(partidoUTC.getTime() - offsetColombia)
-    const deadlineColombia = new Date(partidoColombia)
-    deadlineColombia.setDate(deadlineColombia.getDate() - 1)
-    deadlineColombia.setHours(23, 59, 59, 0)
-    const ahoraColombia = new Date(Date.now() - offsetColombia)
-    return ahoraColombia > deadlineColombia
+    const c = new Date(partidoUTC.getTime() - 5 * 60 * 60 * 1000)
+    const deadlineUTC = Date.UTC(c.getUTCFullYear(), c.getUTCMonth(), c.getUTCDate(), 4, 59, 59)
+    return Date.now() > deadlineUTC
   }
   async function enviarProno(partido) {
     if (enviados[partido.id]) return
