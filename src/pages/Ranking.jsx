@@ -337,7 +337,7 @@ export default function Ranking({ participante }) {
                   }
                 </div>
                 <div style={{...s.avatar, background: COLORS[i % COLORS.length] + '22', border: '1px solid ' + COLORS[i % COLORS.length] + '44', color: COLORS[i % COLORS.length]}}>
-                  {initials}
+                  {p.foto_url ? <img src={p.foto_url} alt="" style={{width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%'}} /> : initials}
                 </div>
                 <div style={s.info}>
                   <div style={s.nombre}>
