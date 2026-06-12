@@ -34,11 +34,7 @@ function Countdown() {
     return () => clearInterval(i)
   }, [])
 
-  if (tiempo.started) return (
-    <div style={cd.wrap}>
-      <div style={cd.startedText}>🏆 EL MUNDIAL HA COMENZADO</div>
-    </div>
-  )
+  if (tiempo.started) return null
 
   return (
     <div style={cd.wrap}>
@@ -62,22 +58,63 @@ const cd = {
   box: { background: '#111', border: '1px solid #222', borderRadius: 8, padding: '8px 12px', minWidth: 56 },
   num: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 900, color: '#F5F0E8', lineHeight: 1 },
   unit: { fontSize: 9, letterSpacing: 2, color: '#888880', marginTop: 2 },
-  startedText: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 900, color: '#C9A84C', letterSpacing: 2 },
+}
+
+function BallIcon({ color }) {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign:'middle', flexShrink:0}}>
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 7.5l4.3 3.1-1.6 5H9.3l-1.6-5z"/>
+    </svg>
+  )
 }
 
 function ProximosPartidos() {
-  const [partidos, setPartidos] = useState([])
+  const [pendientes, setPendientes] = useState([])
+  const [ultimos, setUltimos] = useState([])
+  const [equipoGol, setEquipoGol] = useState({})
+
   useEffect(() => {
-    supabase.from('partidos').select('*').neq('estado','oculto').order('fecha_hora').limit(10).then(({data}) => setPartidos(data || []))
+    async function load() {
+      const { data: pend } = await supabase.from('partidos').select('*')
+        .neq('estado','oculto').neq('estado','finalizado')
+        .order('fecha_hora').limit(10)
+      const { data: fin } = await supabase.from('partidos').select('*')
+        .eq('estado','finalizado')
+        .order('fecha_hora', { ascending: false }).limit(2)
+      setPendientes(pend || [])
+      setUltimos(fin || [])
+
+      const norm = t => t.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      const conGol = [...(pend || []), ...(fin || [])].filter(p => p.primer_anotador && norm(p.primer_anotador) !== 'autogol')
+      const mapa = {}
+      for (const p of conGol) {
+        const { data: jl } = await supabase.from('jugadores').select('nombre').eq('equipo', p.equipo_local)
+        const { data: jv } = await supabase.from('jugadores').select('nombre').eq('equipo', p.equipo_visita)
+        const objetivo = norm(p.primer_anotador)
+        const apellidoObj = objetivo.replace(/^[a-z]\.\s*/, '')
+        const esta = lista => (lista || []).some(j => {
+          const n = norm(j.nombre)
+          if (n === objetivo) return true
+          const apellidoJug = n.replace(/^[a-z]\.\s*/, '')
+          return apellidoObj.length > 2 && (apellidoJug === apellidoObj || n.indexOf(apellidoObj) >= 0 || apellidoObj.indexOf(apellidoJug) >= 0)
+        })
+        if (esta(jl)) mapa[p.id] = 'local'
+        else if (esta(jv)) mapa[p.id] = 'visita'
+        else mapa[p.id] = 'local'
+      }
+      setEquipoGol(mapa)
+    }
+    load()
   }, [])
 
   const ahora = new Date()
-  const enVivo = partidos.filter(p => {
+  const enVivo = pendientes.filter(p => {
     const ini = new Date(p.fecha_hora)
     const fin = new Date(ini.getTime() + 2*60*60*1000)
-    return p.estado !== 'finalizado' && ahora >= ini && ahora <= fin
+    return ahora >= ini && ahora <= fin
   })
-  const proximos = partidos.filter(p => new Date(p.fecha_hora) > ahora && p.estado !== 'finalizado').slice(0,3)
+  const proximos = pendientes.filter(p => new Date(p.fecha_hora) > ahora).slice(0,3)
 
   const fmt = f => {
     const d = new Date(f)
@@ -91,29 +128,82 @@ function ProximosPartidos() {
 
   const rondaLabel = r => ({R1:'Grupos',R2:'16avos',R3:'Octavos',R4:'Cuartos',R5:'Semis',R6:'Final'})[r] || r
 
-  if (partidos.length === 0) return null
+  const goleadorTag = (p, alignRight) => (
+    <span style={{...pp.ronda, display:'flex', alignItems:'center', gap:4, justifyContent: alignRight ? 'flex-end' : 'flex-start'}}>
+      <BallIcon color="#C9A84C" />
+      {p.primer_anotador}
+    </span>
+  )
+
+  if (pendientes.length === 0 && ultimos.length === 0) return null
 
   return (
     <div style={{marginBottom:'1rem'}}>
-      {enVivo.map(p => (
-        <div key={p.id} style={pp.liveCard}>
-          <div style={pp.liveHeader}>
-            <span style={pp.liveDot}></span>
-            <span style={pp.liveLabel}>EN VIVO · {rondaLabel(p.ronda)}</span>
-            {p.minuto && <span style={pp.liveMin}>{p.minuto}'</span>}
-          </div>
-          <div style={pp.matchRow}>
-            <span style={pp.team}>{p.equipo_local}</span>
-            <div style={pp.liveScore}>{p.goles_local != null ? p.goles_local : '–'} : {p.goles_visita != null ? p.goles_visita : '–'}</div>
-            <span style={{...pp.team, textAlign:'right'}}>{p.equipo_visita}</span>
-          </div>
-          {p.primer_anotador && (
-            <div style={{textAlign:'center', fontSize:11, color:'#888880', marginTop:6}}>
-              ⚽ {p.primer_anotador}
+      {enVivo.map(p => {
+        const lado = equipoGol[p.id]
+        const tieneGol = !!p.primer_anotador
+        const minutoTag = <span style={pp.minuto}>{p.minuto ? p.minuto + "'" : ''}</span>
+        return (
+          <div key={p.id} style={{marginBottom: 8}}>
+            <div style={pp.liveTag}>
+              <span style={pp.liveDot}></span>
+              <span style={pp.liveText}>en vivo</span>
             </div>
-          )}
-        </div>
-      ))}
+            <div style={pp.card}>
+              <div style={pp.cardTop}>
+                {tieneGol
+                  ? (lado === 'visita' ? minutoTag : goleadorTag(p, false))
+                  : <span style={pp.ronda}>{rondaLabel(p.ronda)}</span>}
+                {tieneGol
+                  ? (lado === 'visita' ? goleadorTag(p, true) : minutoTag)
+                  : minutoTag}
+              </div>
+              <div style={pp.matchRow}>
+                <span style={pp.team}>{p.equipo_local}</span>
+                <div style={pp.scoreWrap}>
+                  <span style={{...pp.scoreBox, color:'#FF2D2D'}}>{p.goles_local != null ? p.goles_local : '–'}</span>
+                  <span style={pp.vs}>VS</span>
+                  <span style={{...pp.scoreBox, color:'#FF2D2D'}}>{p.goles_visita != null ? p.goles_visita : '–'}</span>
+                </div>
+                <span style={{...pp.team, textAlign:'right'}}>{p.equipo_visita}</span>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+
+      {ultimos.length > 0 && (
+        <>
+          <div style={pp.sectionTitle}>{ultimos.length === 1 ? 'ÚLTIMO PARTIDO' : 'ÚLTIMOS PARTIDOS'}</div>
+          {ultimos.map(p => {
+            const lado = equipoGol[p.id]
+            const tieneGol = !!p.primer_anotador
+            const fechaTag = <span style={pp.fecha}>{fmt(p.fecha_hora)}</span>
+            return (
+              <div key={p.id} style={pp.card}>
+                <div style={pp.cardTop}>
+                  {tieneGol
+                    ? (lado === 'visita' ? fechaTag : goleadorTag(p, false))
+                    : <span style={pp.ronda}>{rondaLabel(p.ronda)}</span>}
+                  {tieneGol
+                    ? (lado === 'visita' ? goleadorTag(p, true) : fechaTag)
+                    : fechaTag}
+                </div>
+                <div style={pp.matchRow}>
+                  <span style={pp.team}>{p.equipo_local}</span>
+                  <div style={pp.scoreWrap}>
+                    <span style={pp.scoreBox}>{p.goles_local != null ? p.goles_local : '–'}</span>
+                    <span style={pp.vs}>VS</span>
+                    <span style={pp.scoreBox}>{p.goles_visita != null ? p.goles_visita : '–'}</span>
+                  </div>
+                  <span style={{...pp.team, textAlign:'right'}}>{p.equipo_visita}</span>
+                </div>
+              </div>
+            )
+          })}
+        </>
+      )}
+
       {proximos.length > 0 && (
         <>
           <div style={pp.sectionTitle}>PRÓXIMOS PARTIDOS</div>
@@ -137,19 +227,20 @@ function ProximosPartidos() {
 }
 
 const pp = {
-  sectionTitle: { fontSize: 10, letterSpacing: 3, color: '#888880', fontWeight: 700, marginBottom: 8 },
-  liveCard: { background: 'linear-gradient(135deg, #1a0808, #0a0a0a)', border: '1px solid #7a0f0f', borderRadius: 12, padding: '12px 14px', marginBottom: 8 },
-  liveHeader: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
+  sectionTitle: { fontSize: 10, letterSpacing: 3, color: '#888880', fontWeight: 700, marginBottom: 8, marginTop: 4 },
+  liveTag: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 6 },
   liveDot: { width: 8, height: 8, borderRadius: '50%', background: '#FF2D2D', display: 'inline-block' },
-  liveMin: { fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#FF2D2D', marginLeft: 8, fontFamily: "'Barlow Condensed', sans-serif" },
-  liveScore: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 900, color: '#FF2D2D', minWidth: 70, textAlign: 'center' },
+  liveText: { fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#FF2D2D', fontFamily: "'Barlow Condensed', sans-serif", textTransform: 'lowercase' },
   card: { background: '#111', border: '1px solid #1e1e1e', borderRadius: 12, padding: '10px 14px', marginBottom: 8 },
-  cardTop: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 },
+  cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 },
   ronda: { fontSize: 10, fontWeight: 700, letterSpacing: 1, color: '#C9A84C' },
   fecha: { fontSize: 11, color: '#888880' },
+  minuto: { fontSize: 11, fontWeight: 700, color: '#00C97A' },
   matchRow: { display: 'flex', alignItems: 'center', gap: 8 },
   team: { flex: 1, fontSize: 14, fontWeight: 600, color: '#F5F0E8' },
   vs: { fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#444', minWidth: 30, textAlign: 'center' },
+  scoreWrap: { display: 'flex', alignItems: 'center', gap: 6 },
+  scoreBox: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 900, color: '#F5F0E8', background: '#0a0a0a', border: '1px solid #222', borderRadius: 8, minWidth: 32, padding: '4px 0', textAlign: 'center' },
 }
 
 export default function Ranking({ participante }) {
