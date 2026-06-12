@@ -84,7 +84,7 @@ export default function Pronosticos({ participante }) {
     }))
   }
 
- ffunction isDeadlinePassed(fechaHora) {
+ function isDeadlinePassed(fechaHora) {
     const partidoUTC = new Date(fechaHora)
     const c = new Date(partidoUTC.getTime() - 5 * 60 * 60 * 1000)
     const deadlineUTC = Date.UTC(c.getUTCFullYear(), c.getUTCMonth(), c.getUTCDate(), 4, 59, 59)
