@@ -59,8 +59,9 @@ export default function Rivales() {
     let total = 0
     const marcadorOk = pick.goles_local === partido.goles_local && pick.goles_visita === partido.goles_visita
     const resultadoOk = Math.sign(pick.goles_local - pick.goles_visita) === Math.sign(partido.goles_local - partido.goles_visita)
+    const norm = t => t.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     const anotadorOk = pick.primer_anotador && partido.primer_anotador &&
-      pick.primer_anotador.toLowerCase().trim() === partido.primer_anotador.toLowerCase().trim()
+      norm(pick.primer_anotador) === norm(partido.primer_anotador)
     if (marcadorOk) total += pts.m
     else if (resultadoOk) total += pts.r
     if (anotadorOk) total += pts.a
