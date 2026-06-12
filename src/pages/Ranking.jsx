@@ -254,7 +254,7 @@ export default function Ranking({ participante }) {
     setLoading(true)
     const { data } = await supabase
       .from('participantes')
-      .select('id, nombre, activo, puntos(total, pts_marcador, pts_anotador, pts_resultado, partido_id, partidos(ronda, fecha_hora))')
+      .select('id, nombre, activo, foto_url, puntos(total, pts_marcador, pts_anotador, pts_resultado, partido_id, partidos(ronda, fecha_hora))')
 
     if (!data) { setLoading(false); return }
     const hoy = new Date().toDateString()
