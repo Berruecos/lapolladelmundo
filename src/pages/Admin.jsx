@@ -133,6 +133,7 @@ export default function Admin({ participante }) {
             nombre: p.name,
             numero: p.number || null,
             posicion: p.position || null,
+            api_player_id: p.id || null,
           }
         })
 
