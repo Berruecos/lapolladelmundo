@@ -1,15 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-const RONDAS = [
-  { id: 'R1', label: 'GRUPOS' },
-  { id: 'R2', label: '16AVOS' },
-  { id: 'R3', label: 'OCTAVOS' },
-  { id: 'R4', label: 'CUARTOS' },
-  { id: 'R5', label: 'SEMIS' },
-  { id: 'R6', label: 'FINAL' },
-]
-
 const PUNTOS_RONDA = {
   R1: { marcador: 3, anotador: 2, resultado: 1 },
   R2: { marcador: 6, anotador: 4, resultado: 2 },
@@ -19,8 +10,30 @@ const PUNTOS_RONDA = {
   R6: { marcador: 30, anotador: 18, resultado: 12 },
 }
 
+function deadlineTs(fechaHora) {
+  const partidoUTC = new Date(fechaHora)
+  const c = new Date(partidoUTC.getTime() - 5 * 60 * 60 * 1000)
+  return Date.UTC(c.getUTCFullYear(), c.getUTCMonth(), c.getUTCDate(), 4, 59, 59)
+}
+
+function fmtCountdown(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const sg = total % 60
+  const pad = n => String(n).padStart(2, '0')
+  return pad(h) + ':' + pad(m) + ':' + pad(sg)
+}
+
+function colorCountdown(ms) {
+  const horas = ms / 3600000
+  if (horas > 10) return '#00C97A'
+  if (horas > 2) return '#1E6FFF'
+  return '#FF2D2D'
+}
+
 export default function Pronosticos({ participante }) {
-  const [ronda, setRonda] = useState('R1')
+  const [tab, setTab] = useState('disponibles')
   const [partidos, setPartidos] = useState([])
   const [pronosticos, setPronosticos] = useState({})
   const [enviados, setEnviados] = useState({})
@@ -28,15 +41,20 @@ export default function Pronosticos({ participante }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(null)
   const [pronosticosActivos, setPronosticosActivos] = useState(true)
-  const [msg, setMsg] = useState('')
+  const [now, setNow] = useState(Date.now())
 
-  useEffect(() => { fetchData() }, [ronda])
+  useEffect(() => { fetchData() }, [])
+
+  useEffect(() => {
+    const i = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(i)
+  }, [])
 
   async function fetchData() {
     setLoading(true)
 
     const { data: ps } = await supabase
-      .from('partidos').select('*').eq('ronda', ronda).neq('estado', 'oculto').order('fecha_hora')
+      .from('partidos').select('*').neq('estado', 'oculto').order('fecha_hora')
 
     const ids = (ps || []).map(p => p.id)
 
@@ -55,7 +73,7 @@ export default function Pronosticos({ participante }) {
     const enviadosMap = {}
     ;(pronos || []).forEach(pr => {
       pronosMap[pr.partido_id] = { local: pr.goles_local, visita: pr.goles_visita, scorer: pr.primer_anotador }
-      enviadosMap[pr.partido_id] = pr.bloqueado || false
+      enviadosMap[pr.partido_id] = true
     })
 
     const jugsMap = {}
@@ -84,12 +102,6 @@ export default function Pronosticos({ participante }) {
     }))
   }
 
- function isDeadlinePassed(fechaHora) {
-    const partidoUTC = new Date(fechaHora)
-    const c = new Date(partidoUTC.getTime() - 5 * 60 * 60 * 1000)
-    const deadlineUTC = Date.UTC(c.getUTCFullYear(), c.getUTCMonth(), c.getUTCDate(), 4, 59, 59)
-    return Date.now() > deadlineUTC
-  }
   async function enviarProno(partido) {
     if (enviados[partido.id]) return
     setSaving(partido.id)
@@ -106,8 +118,6 @@ export default function Pronosticos({ participante }) {
 
     if (!error) {
       setEnviados(prev => ({ ...prev, [partido.id]: true }))
-    } else {
-      setMsg('Error al guardar')
     }
     setSaving(null)
   }
@@ -115,35 +125,48 @@ export default function Pronosticos({ participante }) {
   const fmtFecha = f => new Date(f).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
   const rondaLabel = r => ({ R1:'Grupos', R2:'16avos', R3:'Octavos', R4:'Cuartos', R5:'Semis', R6:'Final' })[r] || r
 
+  const disponibles = partidos.filter(p => !enviados[p.id] && now < deadlineTs(p.fecha_hora))
+  const listaEnviados = partidos.filter(p => enviados[p.id] || now >= deadlineTs(p.fecha_hora))
+
+  const lista = tab === 'disponibles' ? disponibles : listaEnviados
+
   return (
     <div style={s.page}>
-      <div style={s.rondas}>
-        {RONDAS.map(r => (
-          <button key={r.id} style={{...s.rondaBtn, ...(ronda===r.id ? s.rondaActive : {})}} onClick={() => setRonda(r.id)}>{r.label}</button>
-        ))}
-      </div>
-
-      <div style={s.hint}>
-        ⏰ Deadline: 23:59 del día anterior · Una vez enviado no se puede editar
+      <div style={s.tabs}>
+        <button style={{...s.tabBtn, ...(tab === 'disponibles' ? s.tabActive : {})}} onClick={() => setTab('disponibles')}>
+          DISPONIBLES ({disponibles.length})
+        </button>
+        <button style={{...s.tabBtn, ...(tab === 'enviados' ? s.tabActive : {})}} onClick={() => setTab('enviados')}>
+          ENVIADOS ({listaEnviados.length})
+        </button>
       </div>
 
       {loading ? <div style={s.loading}>Cargando...</div> :
-       partidos.length === 0 ? <div style={s.empty}><p>Sin partidos en esta ronda aún.</p></div> : (
-        partidos.map(p => {
-          const pr = pronosticos[p.id] || { local: 0, visita: 0, scorer: '' }
-          const passed = isDeadlinePassed(p.fecha_hora)
+       lista.length === 0 ? (
+        <div style={s.empty}>
+          <p>{tab === 'disponibles' ? '¡Estás al día! No tienes pronósticos pendientes.' : 'Aún no has enviado pronósticos.'}</p>
+        </div>
+       ) : (
+        lista.map(p => {
+          const dts = deadlineTs(p.fecha_hora)
+          const passed = now >= dts
           const enviado = enviados[p.id]
           const bloqueado = passed || enviado
+          const pr = pronosticos[p.id] || (passed && !enviado ? { local: 0, visita: 0, scorer: 'autogol' } : { local: 0, visita: 0, scorer: '' })
           const pts = PUNTOS_RONDA[p.ronda]
           const jugLocal = jugadores[p.equipo_local] || []
           const jugVisita = jugadores[p.equipo_visita] || []
-          const todosJug = [...jugLocal, ...jugVisita].sort()
+          const todosJug = [...jugLocal, ...jugVisita]
+          const restante = dts - now
 
           return (
             <div key={p.id} style={{...s.card, ...(bloqueado ? s.cardLocked : {})}}>
               <div style={s.cardTop}>
                 <span style={s.rondaBadge}>{rondaLabel(p.ronda)}</span>
                 <span style={s.fecha}>{fmtFecha(p.fecha_hora)}</span>
+                {!bloqueado && (
+                  <span style={{...s.countdown, color: colorCountdown(restante)}}>{fmtCountdown(restante)}</span>
+                )}
                 {enviado && <span style={s.enviadoBadge}>✓ ENVIADO</span>}
                 {passed && !enviado && <span style={s.closedBadge}>CERRADO</span>}
               </div>
@@ -164,22 +187,25 @@ export default function Pronosticos({ participante }) {
 
               <div style={s.scorerRow}>
                 <div style={s.scorerLabel}>⚽ PRIMER ANOTADOR</div>
-                {todosJug.length > 0 ? (
-                  <select style={{...s.scorerSelect, ...(bloqueado ? s.inputLocked : {})}}
-                    value={pr.scorer || ''} disabled={bloqueado}
+                {bloqueado ? (
+                  <input type="text" style={{...s.scorerInput, ...s.inputLocked}}
+                    value={pr.scorer || '—'} disabled />
+                ) : todosJug.length > 0 ? (
+                  <select style={s.scorerSelect}
+                    value={pr.scorer || ''}
                     onChange={e => updateProno(p.id, 'scorer', e.target.value)}>
                     <option value="">— Selecciona jugador —</option>
                     <option value="autogol">Autogol</option>
                     <optgroup label={p.equipo_local}>
-                      {jugLocal.map(j => <option key={j.nombre} value={j.nombre}>{j.numero ? `${j.numero} · ${j.nombre}` : j.nombre}</option>)}
+                      {jugLocal.map(j => <option key={j.nombre} value={j.nombre}>{j.numero ? j.numero + ' · ' + j.nombre : j.nombre}</option>)}
                     </optgroup>
                     <optgroup label={p.equipo_visita}>
-                      {jugVisita.map(j => <option key={j.nombre} value={j.nombre}>{j.numero ? `${j.numero} · ${j.nombre}` : j.nombre}</option>)}
+                      {jugVisita.map(j => <option key={j.nombre} value={j.nombre}>{j.numero ? j.numero + ' · ' + j.nombre : j.nombre}</option>)}
                     </optgroup>
                   </select>
                 ) : (
-                  <input type="text" style={{...s.scorerInput, ...(bloqueado ? s.inputLocked : {})}}
-                    placeholder="Nombre del jugador" value={pr.scorer || ''} disabled={bloqueado}
+                  <input type="text" style={s.scorerInput}
+                    placeholder="Nombre del jugador" value={pr.scorer || ''}
                     onChange={e => updateProno(p.id, 'scorer', e.target.value)} />
                 )}
               </div>
@@ -208,10 +234,9 @@ export default function Pronosticos({ participante }) {
 
 const s = {
   page: { padding: '1rem 0' },
-  rondas: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: '0.75rem' },
-  rondaBtn: { padding: '5px 12px', borderRadius: 100, border: '1px solid #222', background: 'transparent', fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: 'pointer', color: '#888880', fontFamily: "'Barlow Condensed', sans-serif" },
-  rondaActive: { background: '#C9A84C', color: '#0a0a0a', borderColor: '#C9A84C' },
-  hint: { fontSize: 11, color: '#C9A84C', background: '#161200', padding: '8px 12px', borderRadius: 8, marginBottom: '1rem', border: '1px solid #2a2000' },
+  tabs: { display: 'flex', gap: 8, marginBottom: '1rem' },
+  tabBtn: { flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #222', background: 'transparent', fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: 'pointer', color: '#888880', fontFamily: "'Barlow Condensed', sans-serif" },
+  tabActive: { background: '#C9A84C', color: '#0a0a0a', borderColor: '#C9A84C' },
   loading: { textAlign: 'center', color: '#444', padding: '2rem', fontSize: 13 },
   empty: { textAlign: 'center', color: '#444', padding: '2rem', fontSize: 14 },
   card: { background: '#111', border: '1px solid #1e1e1e', borderRadius: 14, padding: '14px', marginBottom: 10 },
@@ -219,6 +244,7 @@ const s = {
   cardTop: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
   rondaBadge: { fontSize: 10, fontWeight: 700, letterSpacing: 1, color: '#C9A84C' },
   fecha: { fontSize: 11, color: '#888880', flex: 1 },
+  countdown: { fontSize: 13, fontWeight: 900, fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 1 },
   enviadoBadge: { fontSize: 10, fontWeight: 700, letterSpacing: 1, color: '#00C97A', background: '#001a0f', padding: '2px 8px', borderRadius: 100 },
   closedBadge: { fontSize: 10, fontWeight: 700, letterSpacing: 1, color: '#FF2D2D', background: '#1a0808', padding: '2px 8px', borderRadius: 100 },
   matchRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 },
