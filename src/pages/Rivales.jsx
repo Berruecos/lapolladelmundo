@@ -23,7 +23,7 @@ export default function Rivales() {
     const { data } = await supabase
       .from('partidos').select('*')
       .eq('ronda', ronda)
-      .order('fecha_hora')
+.order('fecha_hora', { ascending: false })
     const cerrados = (data || []).filter(p => p.estado === 'finalizado' || isDeadlinePassed(p.fecha_hora))
     setPartidos(cerrados)
     setSelectedPartido(null)
