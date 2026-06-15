@@ -13,9 +13,9 @@ const RONDAS = [
 export default function Rivales() {
   const [ronda, setRonda] = useState('R1')
   const [partidos, setPartidos] = useState([])
-  const [selectedPartido, setSelectedPartido] = useState(null)
-  const [picks, setPicks] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [selectedId, setSelectedId] = useState(null)
+  const [picksByPartido, setPicksByPartido] = useState({})
+  const [loadingId, setLoadingId] = useState(null)
 
   useEffect(() => { fetchPartidos() }, [ronda])
 
@@ -23,11 +23,10 @@ export default function Rivales() {
     const { data } = await supabase
       .from('partidos').select('*')
       .eq('ronda', ronda)
-.order('fecha_hora', { ascending: false })
+      .order('fecha_hora', { ascending: false })
     const cerrados = (data || []).filter(p => p.estado === 'finalizado' || isDeadlinePassed(p.fecha_hora))
     setPartidos(cerrados)
-    setSelectedPartido(null)
-    setPicks([])
+    setSelectedId(null)
   }
 
   function isDeadlinePassed(fechaHora) {
@@ -37,16 +36,22 @@ export default function Rivales() {
     return Date.now() > deadlineUTC
   }
 
-  async function fetchPicks(partido) {
-    setSelectedPartido(partido)
-    setLoading(true)
-    const { data } = await supabase
-      .from('pronosticos')
-      .select('*, participantes(nombre)')
-      .eq('partido_id', partido.id)
-      .order('participantes(nombre)')
-    setPicks(data || [])
-    setLoading(false)
+  async function togglePartido(partido) {
+    if (selectedId === partido.id) {
+      setSelectedId(null)
+      return
+    }
+    setSelectedId(partido.id)
+    if (!picksByPartido[partido.id]) {
+      setLoadingId(partido.id)
+      const { data } = await supabase
+        .from('pronosticos')
+        .select('*, participantes(nombre)')
+        .eq('partido_id', partido.id)
+        .order('participantes(nombre)')
+      setPicksByPartido(prev => ({ ...prev, [partido.id]: data || [] }))
+      setLoadingId(null)
+    }
   }
 
   function calcPuntos(pick, partido) {
@@ -56,8 +61,8 @@ export default function Rivales() {
     const marcadorOk = pick.goles_local === partido.goles_local && pick.goles_visita === partido.goles_visita
     const resultadoOk = Math.sign(pick.goles_local - pick.goles_visita) === Math.sign(partido.goles_local - partido.goles_visita)
     const norm = t => t.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    const anotadorOk = pick.primer_anotador && partido.primer_anotador &&
-      norm(pick.primer_anotador) === norm(partido.primer_anotador)
+    const anotadorOk = (partido.primer_anotador_id && pick.anotador_id && partido.primer_anotador_id === pick.anotador_id) ||
+      (pick.primer_anotador && partido.primer_anotador && norm(pick.primer_anotador) === norm(partido.primer_anotador))
     if (marcadorOk) total += pts.m
     else if (resultadoOk) total += pts.r
     if (anotadorOk) total += pts.a
@@ -85,69 +90,72 @@ export default function Rivales() {
       {partidos.length === 0 ? (
         <div style={s.empty}>Aún no hay partidos cerrados en esta ronda.</div>
       ) : (
-        <>
-          <div style={s.partidosList}>
-            {partidos.map(p => (
-              <button key={p.id}
-                style={{...s.partidoBtn, ...(selectedPartido?.id === p.id ? s.partidoBtnActive : {})}}
-                onClick={() => fetchPicks(p)}>
-                <div style={s.partidoBtnTop}>
-                  <span style={s.rondaBadge}>{rondaLabel(p.ronda)}</span>
-                  <span style={s.fecha}>{fmtFecha(p.fecha_hora)}</span>
-                </div>
-                <div style={s.partidoBtnMatch}>
-                  {p.equipo_local} vs {p.equipo_visita}
-                  {p.goles_local !== null && (
-                    <span style={s.resultadoInline}> · {p.goles_local}–{p.goles_visita}</span>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
+        <div style={s.partidosList}>
+          {partidos.map(p => {
+            const abierto = selectedId === p.id
+            const picks = picksByPartido[p.id] || []
+            return (
+              <div key={p.id}>
+                <button
+                  style={{...s.partidoBtn, ...(abierto ? s.partidoBtnActive : {})}}
+                  onClick={() => togglePartido(p)}>
+                  <div style={s.partidoBtnTop}>
+                    <span style={s.rondaBadge}>{rondaLabel(p.ronda)}</span>
+                    <span style={s.fecha}>{fmtFecha(p.fecha_hora)}</span>
+                  </div>
+                  <div style={s.partidoBtnMatch}>
+                    {p.equipo_local} vs {p.equipo_visita}
+                    {p.goles_local !== null && (
+                      <span style={s.resultadoInline}> · {p.goles_local}–{p.goles_visita}</span>
+                    )}
+                  </div>
+                </button>
 
-          {selectedPartido && (
-            <div style={s.picksSection}>
-              <div style={s.picksHeader}>
-                <div style={s.picksTitle}>{selectedPartido.equipo_local} vs {selectedPartido.equipo_visita}</div>
-                {selectedPartido.goles_local !== null && (
-                  <div style={s.picksResultado}>
-                    Resultado: {selectedPartido.goles_local}–{selectedPartido.goles_visita}
-                    {selectedPartido.primer_anotador && ` · ${selectedPartido.primer_anotador}`}
+                {abierto && (
+                  <div style={s.picksSection}>
+                    <div style={s.picksHeader}>
+                      {p.goles_local !== null && (
+                        <div style={s.picksResultado}>
+                          Resultado: {p.goles_local}–{p.goles_visita}
+                          {p.primer_anotador && ' · ' + p.primer_anotador}
+                        </div>
+                      )}
+                    </div>
+
+                    {loadingId === p.id ? <div style={s.loading}>Cargando picks...</div> :
+                     picks.length === 0 ? <div style={s.empty}>Nadie envió pronóstico para este partido.</div> : (
+                      <div style={s.table}>
+                        <div style={s.tableHeader}>
+                          <span style={s.thName}>PARTICIPANTE</span>
+                          <span style={s.thScore}>{abrev(p.equipo_local)} – {abrev(p.equipo_visita)}</span>
+                          <span style={s.thScorer}>ANOTADOR</span>
+                          <span style={s.thPts}>PTS</span>
+                        </div>
+                        {picks.map(pick => {
+                          const puntos = calcPuntos(pick, p)
+                          return (
+                            <div key={pick.id} style={{...s.tableRow, ...(puntos?.total > 0 ? s.rowWin : {})}}>
+                              <span style={s.tdName}>{pick.participantes?.nombre || '—'}</span>
+                              <span style={{...s.tdScore, ...(puntos?.marcadorOk ? s.textGold : puntos?.resultadoOk ? s.textGreen : {})}}>
+                                {pick.goles_local}–{pick.goles_visita}
+                              </span>
+                              <span style={{...s.tdScorer, ...(puntos?.anotadorOk ? s.textGold : {})}}>
+                                {pick.primer_anotador || '—'}
+                              </span>
+                              <span style={s.tdPts}>
+                                {puntos !== null ? <strong>{puntos.total}</strong> : '—'}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-
-              {loading ? <div style={s.loading}>Cargando picks...</div> :
-               picks.length === 0 ? <div style={s.empty}>Nadie envió pronóstico para este partido.</div> : (
-                <div style={s.table}>
-                  <div style={s.tableHeader}>
-                    <span style={s.thName}>PARTICIPANTE</span>
-                    <span style={s.thScore}>{abrev(selectedPartido.equipo_local)} – {abrev(selectedPartido.equipo_visita)}</span>
-                    <span style={s.thScorer}>ANOTADOR</span>
-                    <span style={s.thPts}>PTS</span>
-                  </div>
-                  {picks.map(pick => {
-                    const puntos = calcPuntos(pick, selectedPartido)
-                    return (
-                      <div key={pick.id} style={{...s.tableRow, ...(puntos?.total > 0 ? s.rowWin : {})}}>
-                        <span style={s.tdName}>{pick.participantes?.nombre || '—'}</span>
-                        <span style={{...s.tdScore, ...(puntos?.marcadorOk ? s.textGold : puntos?.resultadoOk ? s.textGreen : {})}}>
-                          {pick.goles_local}–{pick.goles_visita}
-                        </span>
-                        <span style={{...s.tdScorer, ...(puntos?.anotadorOk ? s.textGold : {})}}>
-                          {pick.primer_anotador || '—'}
-                        </span>
-                        <span style={s.tdPts}>
-                          {puntos !== null ? <strong>{puntos.total}</strong> : '—'}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </>
+            )
+          })}
+        </div>
       )}
     </div>
   )
@@ -162,16 +170,15 @@ const s = {
   empty: { textAlign: 'center', color: '#444', padding: '2rem', fontSize: 13 },
   loading: { textAlign: 'center', color: '#444', padding: '1rem', fontSize: 13 },
   partidosList: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: '1rem' },
-  partidoBtn: { background: '#111', border: '1px solid #1e1e1e', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', textAlign: 'left', transition: 'all .15s' },
-  partidoBtnActive: { border: '1px solid #C9A84C44', background: '#161200' },
+  partidoBtn: { width: '100%', background: '#111', border: '1px solid #1e1e1e', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', textAlign: 'left', transition: 'all .15s' },
+  partidoBtnActive: { border: '1px solid #C9A84C44', background: '#161200', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   partidoBtnTop: { display: 'flex', justifyContent: 'space-between', marginBottom: 4 },
   rondaBadge: { fontSize: 10, fontWeight: 700, letterSpacing: 1, color: '#C9A84C' },
   fecha: { fontSize: 11, color: '#888880' },
   partidoBtnMatch: { fontSize: 14, fontWeight: 600, color: '#F5F0E8' },
   resultadoInline: { color: '#00C97A', fontWeight: 700 },
-  picksSection: { background: '#111', border: '1px solid #1e1e1e', borderRadius: 14, padding: '14px' },
-  picksHeader: { marginBottom: '1rem' },
-  picksTitle: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 20, fontWeight: 700, color: '#F5F0E8', marginBottom: 4 },
+  picksSection: { background: '#111', border: '1px solid #C9A84C44', borderTop: 'none', borderBottomLeftRadius: 14, borderBottomRightRadius: 14, padding: '14px' },
+  picksHeader: { marginBottom: '0.75rem' },
   picksResultado: { fontSize: 12, color: '#00C97A' },
   table: { display: 'flex', flexDirection: 'column', gap: 0 },
   tableHeader: { display: 'flex', gap: 8, padding: '6px 0', borderBottom: '1px solid #1e1e1e', marginBottom: 4 },
