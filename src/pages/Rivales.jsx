@@ -11,13 +11,22 @@ const RONDAS = [
 ]
 
 export default function Rivales() {
-  const [ronda, setRonda] = useState('R1')
+  const [ronda, setRonda] = useState(null)
   const [partidos, setPartidos] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [picksByPartido, setPicksByPartido] = useState({})
   const [loadingId, setLoadingId] = useState(null)
 
-  useEffect(() => { fetchPartidos() }, [ronda])
+  useEffect(() => { detectarRonda() }, [])
+
+  useEffect(() => { if (ronda) fetchPartidos() }, [ronda])
+
+  async function detectarRonda() {
+    const ahora = new Date().toISOString()
+    const { data } = await supabase.from('partidos').select('ronda, fecha_hora').neq('estado','oculto').lte('fecha_hora', ahora).order('fecha_hora', { ascending: false }).limit(1)
+    if (data && data.length > 0) setRonda(data[0].ronda)
+    else setRonda('R1')
+  }
 
   async function fetchPartidos() {
     const { data } = await supabase
