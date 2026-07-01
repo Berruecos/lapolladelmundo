@@ -109,11 +109,8 @@ function ProximosPartidos() {
   }, [])
 
   const ahora = new Date()
-  const enVivo = pendientes.filter(p => {
-    const ini = new Date(p.fecha_hora)
-    const fin = new Date(ini.getTime() + 2*60*60*1000)
-    return ahora >= ini && ahora <= fin
-  })
+  const EN_JUEGO = ['1H','HT','2H','ET','BT','P','LIVE','INT']
+  const enVivo = pendientes.filter(p => EN_JUEGO.includes(p.estado_api))
   const proximos = pendientes.filter(p => new Date(p.fecha_hora) > ahora).slice(0,3)
 
   const fmt = f => {
