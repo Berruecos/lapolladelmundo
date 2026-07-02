@@ -323,7 +323,7 @@ export default function Ranking({ participante }) {
             const activeIndex = activos.findIndex(a => a.id === p.id)
             const initials = p.nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
             const isMe = p.id === participante?.id
-            const medal = activeIndex === 0 ? '🥇' : activeIndex === 1 ? '🥈' : activeIndex === 2 ? '🥉' : null
+            const medal = activeIndex === 0 ? '🥇' : activeIndex === 1 ? '🥈' : activeIndex === 2 ? '😭' : null
 
             return (
               <div key={p.id} style={{...s.row, ...(isMe ? s.rowMe : {}), ...(!isActive ? s.rowInactive : {})}}>
