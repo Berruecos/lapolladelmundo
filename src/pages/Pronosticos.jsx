@@ -40,6 +40,7 @@ export default function Pronosticos({ participante }) {
   const [jugadores, setJugadores] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(null)
+  const [errorEnvio, setErrorEnvio] = useState(null)
   const [pronosticosActivos, setPronosticosActivos] = useState(true)
   const [now, setNow] = useState(Date.now())
 
@@ -122,9 +123,17 @@ export default function Pronosticos({ participante }) {
   async function enviarProno(partido) {
     if (enviados[partido.id]) return
     setSaving(partido.id)
+    setErrorEnvio(null)
     const pr = pronosticos[partido.id] || { local: 0, visita: 0, scorer: '', scorerId: null }
 
-    const { error } = await supabase.from('pronosticos').upsert({
+    // 1. Refrescar la sesion para evitar fallos por token vencido
+    try {
+      await supabase.auth.refreshSession()
+    } catch (e) {
+      // si no se puede refrescar seguimos, el upsert dira si hay problema
+    }
+
+    const payload = {
       participante_id: participante.id,
       partido_id: partido.id,
       goles_local: parseInt(pr.local) || 0,
@@ -132,10 +141,18 @@ export default function Pronosticos({ participante }) {
       primer_anotador: pr.scorer || '',
       anotador_id: pr.scorerId || null,
       bloqueado: true,
-    }, { onConflict: 'participante_id,partido_id' })
+    }
 
-    if (!error) {
+    // 2. Guardar y pedir de vuelta la fila para confirmar
+    const { data, error } = await supabase.from('pronosticos')
+      .upsert(payload, { onConflict: 'participante_id,partido_id' })
+      .select()
+
+    // 3. Solo marcar enviado si NO hubo error Y la fila volvio confirmada
+    if (!error && data && data.length > 0) {
       setEnviados(prev => ({ ...prev, [partido.id]: true }))
+    } else {
+      setErrorEnvio(partido.id)
     }
     setSaving(null)
   }
@@ -235,12 +252,19 @@ export default function Pronosticos({ participante }) {
               </div>
 
               {!bloqueado && (
-                <button
-                  style={{...s.enviarBtn, opacity: (!pronosticosActivos || todosJug.length === 0 || saving === p.id) ? 0.4 : 1, cursor: (!pronosticosActivos || todosJug.length === 0) ? 'not-allowed' : 'pointer'}}
-                  onClick={() => pronosticosActivos && todosJug.length > 0 && enviarProno(p)}
-                  disabled={!pronosticosActivos || todosJug.length === 0 || saving === p.id}>
-                  {saving === p.id ? 'ENVIANDO...' : 'ENVIAR PRONÓSTICO'}
-                </button>
+                <>
+                  {errorEnvio === p.id && (
+                    <div style={s.errorMsg}>
+                      ⚠️ No se pudo enviar. Revisa tu conexión y vuelve a intentar. Tu pronóstico NO ha quedado guardado.
+                    </div>
+                  )}
+                  <button
+                    style={{...s.enviarBtn, ...(errorEnvio === p.id ? s.enviarBtnError : {}), opacity: (!pronosticosActivos || todosJug.length === 0 || saving === p.id) ? 0.4 : 1, cursor: (!pronosticosActivos || todosJug.length === 0) ? 'not-allowed' : 'pointer'}}
+                    onClick={() => pronosticosActivos && todosJug.length > 0 && enviarProno(p)}
+                    disabled={!pronosticosActivos || todosJug.length === 0 || saving === p.id}>
+                    {saving === p.id ? 'ENVIANDO...' : errorEnvio === p.id ? 'REINTENTAR ENVÍO' : 'ENVIAR PRONÓSTICO'}
+                  </button>
+                </>
               )}
             </div>
           )
@@ -277,4 +301,6 @@ const s = {
   scorerInput: { width: '100%', padding: '10px 12px', background: '#161616', border: '1px solid #2a2a2a', borderRadius: 8, fontSize: 13, color: '#F5F0E8' },
   ptsInfo: { display: 'flex', gap: 12, fontSize: 11, color: '#444440', marginBottom: 12, flexWrap: 'wrap' },
   enviarBtn: { width: '100%', padding: '12px', background: 'linear-gradient(135deg, #C9A84C, #8a6d2a)', color: '#0a0a0a', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 900, letterSpacing: 2, cursor: 'pointer', fontFamily: "'Barlow Condensed', sans-serif" },
+  enviarBtnError: { background: 'linear-gradient(135deg, #FF2D2D, #a00)' , color: '#fff' },
+  errorMsg: { background: '#1a0808', border: '1px solid #7a0f0f', color: '#FF6B6B', fontSize: 12, padding: '10px 12px', borderRadius: 8, marginBottom: 8, lineHeight: 1.4 },
 }
